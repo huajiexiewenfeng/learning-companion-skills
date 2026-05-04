@@ -1,0 +1,110 @@
+<svg width="1200" height="660" viewBox="0 0 1200 660" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Learning Companion Skills 中文工作流</title>
+  <desc id="desc">一张展示学习计划导入、Dashboard 文件、每日提醒、下课收口、进度追踪和周复盘的工作流图。</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="660" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FAFC"/>
+      <stop offset="0.55" stop-color="#F1F8F6"/>
+      <stop offset="1" stop-color="#FFF7ED"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="14" flood-color="#0F172A" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2 2L10 6L2 10" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      .title { font: 700 42px "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; fill: #0F172A; }
+      .subtitle { font: 400 19px "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; fill: #475569; }
+      .card-title { font: 700 22px "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; fill: #0F172A; }
+      .card-text { font: 400 16px "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; fill: #475569; }
+      .small { font: 400 14px "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; fill: #64748B; }
+      .label { font: 700 13px "Microsoft YaHei", "Noto Sans CJK SC", Arial, sans-serif; fill: #FFFFFF; letter-spacing: .4px; }
+      .mono { font: 700 18px Consolas, monospace; fill: #0F172A; }
+      .card { fill: #FFFFFF; stroke: #E2E8F0; stroke-width: 1.2; }
+      .chip { fill: #F8FAFC; stroke: #CBD5E1; stroke-width: 1; }
+      .line { stroke: #64748B; stroke-width: 2.3; marker-end: url(#arrow); }
+      .muted-line { stroke: #CBD5E1; stroke-width: 1.4; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="660" rx="28" fill="url(#bg)"/>
+  <rect x="34" y="34" width="1132" height="592" rx="26" fill="#FFFFFF" fill-opacity="0.68" stroke="#E2E8F0"/>
+
+  <text x="72" y="92" class="title">Learning Companion Skills</text>
+  <text x="72" y="126" class="subtitle">一个面向长期学习计划的轻量学习管家。</text>
+
+  <g filter="url(#shadow)">
+    <rect x="790" y="68" width="300" height="74" rx="16" fill="#0F766E"/>
+    <text x="820" y="101" class="label" style="font-size:17px">先预览</text>
+    <text x="820" y="125" class="label" style="font-size:17px">确认后再写入</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="72" y="190" width="240" height="146" rx="18" class="card"/>
+    <rect x="96" y="214" width="78" height="26" rx="13" fill="#2563EB"/>
+    <text x="116" y="232" class="label">计划</text>
+    <text x="96" y="273" class="card-title">导入计划</text>
+    <text x="96" y="304" class="card-text">用户提供计划</text>
+    <text x="96" y="328" class="card-text">书籍 / 课程 / 路线</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="380" y="170" width="300" height="186" rx="18" class="card"/>
+    <rect x="404" y="194" width="96" height="26" rx="13" fill="#0F766E"/>
+    <text x="432" y="212" class="label">文件</text>
+    <text x="404" y="253" class="card-title">一个计划</text>
+    <text x="404" y="281" class="card-title">一个 Dashboard</text>
+    <rect x="404" y="308" width="112" height="34" rx="10" class="chip"/>
+    <text x="426" y="330" class="small">map.md</text>
+    <rect x="532" y="308" width="112" height="34" rx="10" class="chip"/>
+    <text x="556" y="330" class="small">log.md</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="748" y="190" width="328" height="146" rx="18" class="card"/>
+    <rect x="772" y="214" width="106" height="26" rx="13" fill="#B45309"/>
+    <text x="808" y="232" class="label">提醒</text>
+    <text x="772" y="273" class="card-title">每日提醒</text>
+    <text x="772" y="304" class="card-text">今日主题</text>
+    <text x="772" y="328" class="card-text">最低完成标准</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="108" y="430" width="280" height="146" rx="18" class="card"/>
+    <rect x="132" y="454" width="90" height="26" rx="13" fill="#7C3AED"/>
+    <text x="162" y="472" class="label">反馈</text>
+    <text x="132" y="513" class="card-title">低摩擦回复</text>
+    <text x="132" y="545" class="mono">1 / 0 / 低配</text>
+    <text x="132" y="569" class="card-text">学完后再下课收口</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="468" y="420" width="284" height="166" rx="18" class="card"/>
+    <rect x="492" y="444" width="94" height="26" rx="13" fill="#DC2626"/>
+    <text x="522" y="462" class="label">验证</text>
+    <text x="492" y="503" class="card-title">下课收口</text>
+    <text x="492" y="535" class="card-text">一句话理解</text>
+    <text x="492" y="559" class="card-text">小题验证</text>
+    <text x="492" y="583" class="card-text">掌握度评分</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="836" y="420" width="264" height="166" rx="18" class="card"/>
+    <rect x="860" y="444" width="98" height="26" rx="13" fill="#0F766E"/>
+    <text x="890" y="462" class="label">追踪</text>
+    <text x="860" y="503" class="card-title">进度追踪</text>
+    <text x="860" y="535" class="card-text">计划进度</text>
+    <line x1="860" y1="550" x2="1044" y2="550" class="muted-line"/>
+    <text x="860" y="579" class="card-text">有效进度</text>
+  </g>
+
+  <path d="M312 263H370" class="line"/>
+  <path d="M680 263H738" class="line"/>
+  <path d="M912 336C912 374 882 396 824 432" class="line"/>
+  <path d="M752 503H826" class="line"/>
+  <path d="M468 503H398" class="line"/>
+  <path d="M248 430C270 390 342 366 434 356" class="line"/>
+
+  <text x="74" y="620" class="small">周复盘只提出阶段调整建议，用户确认后才更新计划。</text>
+</svg>
