@@ -1,0 +1,110 @@
+<svg width="1200" height="640" viewBox="0 0 1200 640" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Learning Companion Skills workflow</title>
+  <desc id="desc">A workflow diagram showing how a learning plan becomes a map, dashboard, reminders, close-out review, progress tracking, and weekly review.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="640" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FAFC"/>
+      <stop offset="0.52" stop-color="#F3F8F6"/>
+      <stop offset="1" stop-color="#FFF8ED"/>
+    </linearGradient>
+    <linearGradient id="primary" x1="120" y1="80" x2="1080" y2="560" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563EB"/>
+      <stop offset="0.52" stop-color="#0F766E"/>
+      <stop offset="1" stop-color="#B45309"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#0F172A" flood-opacity="0.12"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2 2L10 6L2 10" stroke="#475569" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+    <style>
+      .title { font: 700 44px Arial, sans-serif; fill: #0F172A; }
+      .subtitle { font: 400 20px Arial, sans-serif; fill: #475569; }
+      .card-title { font: 700 21px Arial, sans-serif; fill: #0F172A; }
+      .card-text { font: 400 15px Arial, sans-serif; fill: #475569; }
+      .label { font: 700 13px Arial, sans-serif; fill: #FFFFFF; }
+      .metric { font: 700 18px Arial, sans-serif; fill: #0F172A; }
+      .small { font: 400 13px Arial, sans-serif; fill: #64748B; }
+      .mono { font: 700 17px Consolas, monospace; fill: #0F172A; }
+      .card { fill: #FFFFFF; stroke: #E2E8F0; stroke-width: 1.2; }
+      .soft { fill: #F8FAFC; stroke: #CBD5E1; stroke-width: 1; }
+      .line { stroke: #475569; stroke-width: 2.2; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect width="1200" height="640" rx="28" fill="url(#bg)"/>
+  <rect x="34" y="34" width="1132" height="572" rx="26" fill="#FFFFFF" fill-opacity="0.62" stroke="#E2E8F0"/>
+
+  <text x="80" y="100" class="title">Learning Companion Skills</text>
+  <text x="80" y="132" class="subtitle">Turn scattered study sessions into a trackable learning rhythm.</text>
+
+  <g filter="url(#shadow)">
+    <rect x="80" y="182" width="220" height="140" rx="18" class="card"/>
+    <rect x="104" y="206" width="86" height="26" rx="13" fill="#2563EB"/>
+    <text x="118" y="224" class="label">INPUT</text>
+    <text x="104" y="262" class="card-title">Learning Plan</text>
+    <text x="104" y="292" class="card-text">User-provided plan,</text>
+    <text x="104" y="314" class="card-text">book, course, or roadmap</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="382" y="160" width="260" height="184" rx="18" class="card"/>
+    <rect x="406" y="184" width="106" height="26" rx="13" fill="#0F766E"/>
+    <text x="420" y="202" class="label">WORKSPACE</text>
+    <text x="406" y="242" class="card-title">Plan Dashboard</text>
+    <text x="406" y="272" class="card-text">One dashboard per plan</text>
+    <rect x="406" y="294" width="92" height="34" rx="10" class="soft"/>
+    <text x="421" y="316" class="small">map.md</text>
+    <rect x="508" y="294" width="106" height="34" rx="10" class="soft"/>
+    <text x="524" y="316" class="small">log.md</text>
+    <rect x="406" y="338" width="208" height="34" rx="10" class="soft"/>
+    <text x="423" y="360" class="small">dashboard.md</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="730" y="170" width="390" height="154" rx="18" class="card"/>
+    <rect x="754" y="194" width="104" height="26" rx="13" fill="#B45309"/>
+    <text x="769" y="212" class="label">REMINDER</text>
+    <text x="754" y="252" class="card-title">Daily Prompt With Content</text>
+    <text x="754" y="282" class="card-text">Today topic, minimum completion, and low-friction replies</text>
+    <text x="754" y="312" class="mono">1 / 0 / low-power / close-out</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="134" y="424" width="282" height="120" rx="18" class="card"/>
+    <rect x="158" y="448" width="86" height="26" rx="13" fill="#7C3AED"/>
+    <text x="172" y="466" class="label">REVIEW</text>
+    <text x="158" y="506" class="card-title">Close-Out Check</text>
+    <text x="158" y="536" class="card-text">One-sentence understanding + small questions</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="500" y="408" width="260" height="152" rx="18" class="card"/>
+    <rect x="524" y="432" width="92" height="26" rx="13" fill="#0F766E"/>
+    <text x="539" y="450" class="label">PROGRESS</text>
+    <text x="524" y="490" class="card-title">Two Progress Lines</text>
+    <text x="524" y="522" class="metric">Plan progress</text>
+    <text x="524" y="548" class="small">Where the plan has reached</text>
+    <text x="524" y="584" class="metric">Effective progress</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="844" y="420" width="236" height="124" rx="18" class="card"/>
+    <rect x="868" y="444" width="92" height="26" rx="13" fill="#DC2626"/>
+    <text x="883" y="462" class="label">ADJUST</text>
+    <text x="868" y="502" class="card-title">Weekly Review</text>
+    <text x="868" y="532" class="card-text">Find risks, missed close-outs,</text>
+    <text x="868" y="554" class="card-text">and propose stage changes</text>
+  </g>
+
+  <path d="M300 252H372" class="line"/>
+  <path d="M642 252H720" class="line"/>
+  <path d="M922 324C902 378 844 394 760 434" class="line"/>
+  <path d="M500 484H426" class="line"/>
+  <path d="M416 484H490" class="line"/>
+  <path d="M760 484H834" class="line"/>
+
+  <rect x="780" y="74" width="300" height="62" rx="16" fill="url(#primary)" opacity="0.95"/>
+  <text x="810" y="111" class="label" style="font-size:18px">Preview first. Write only after confirmation.</text>
+</svg>

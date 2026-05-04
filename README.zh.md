@@ -4,6 +4,8 @@
 
 [English README](README.md)
 
+![Learning Companion Skills 工作流](assets/learning-companion-flow.svg)
+
 这个项目的目标，是让 AI Agent 成为一个通用型学习管家，适用于技术、文学、哲学、语言、职业技能等长期学习计划。
 
 核心想法很简单：

@@ -4,6 +4,8 @@ AI skills for long-term learning plans, reminders, dashboards, and progress trac
 
 [中文说明](README.zh.md)
 
+![Learning Companion Skills workflow](assets/learning-companion-flow.svg)
+
 This project helps AI agents act as a lightweight learning companion for any subject: technology, literature, philosophy, language learning, professional skills, and more.
 
 The core idea is simple:
