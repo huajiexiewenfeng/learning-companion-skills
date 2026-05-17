@@ -1,6 +1,6 @@
 ---
 name: learning-companion
-description: Use when the user wants to manage a long-term learning plan, create or update a learning dashboard, track study progress across sessions, receive study reminders, record "下课", review learning status, or continue a study plan in any subject.
+description: Use when the user wants to manage a long-term learning plan, create or update a learning dashboard, track study progress across sessions, receive study reminders, record "下课", review learning status, continue a study plan, or asks the assistant to teach today's learning content with phrases like "你来教我学习", "继续学习", "我不明白", "换个例子", or "老师模式".
 ---
 
 # Learning Companion
@@ -21,6 +21,7 @@ This skill may:
 - check whether the plan is too vague or too heavy
 - maintain one dashboard per plan
 - remind the user with today's learning content
+- teach today's learning content in a lightweight tutor mode when requested
 - lightly verify understanding after "下课"
 - update progress and suggest pacing changes
 
@@ -30,6 +31,7 @@ This skill should not:
 - mix all plans into one large dashboard
 - replace the user's source material
 - add large external teaching content by default
+- turn tutor mode into a full curriculum generator unless explicitly asked
 - turn tracking into homework
 
 ## Required References
@@ -103,6 +105,46 @@ When the user replies `下课`, run a short review:
 3. Score mastery.
 4. Update dashboard and log.
 5. Decide tomorrow's strategy.
+
+## Teaching Protocol
+
+Use tutor mode when the user asks for teaching, not just tracking. Trigger examples:
+
+- `你来教我学习`
+- `继续学习`
+- `我不明白`
+- `换个例子`
+- `老师模式`
+- any request that asks the assistant to explain, teach, clarify, or continue today's learning topic
+
+Tutor mode should stay lightweight and tied to the current plan item. It is a teacher layer on top of the learning manager, not a replacement for the source material.
+
+When tutor mode starts:
+
+1. Identify the active plan and today's item from `dashboard.md`.
+2. If today's item is not started, mark it as studying before teaching.
+3. Teach the current topic in small steps:
+   - state the core idea in plain language
+   - connect it to the user's plan, project, or source material
+   - give one concrete example
+   - name one common misconception or boundary
+   - ask exactly one check question
+4. If the user says they do not understand, change the explanation style:
+   - use a simpler analogy
+   - use a smaller example
+   - contrast two nearby concepts
+   - avoid repeating the same wording
+5. If the user asks for another example, give one focused example and then ask one check question.
+
+Tutor mode must not:
+
+- advance effective progress without a close-out review
+- overwhelm the user with a long lecture
+- introduce large external material unless the user asks
+- ask multiple questions at once
+- turn the session into homework
+
+At the end of a tutor-mode response, invite the user to continue with one low-friction next step. If the user appears ready to finish, ask them to reply `下课` so the normal close-out review can score mastery and update progress.
 
 ## Progress Rule
 

@@ -30,12 +30,27 @@ It supports:
 - one dashboard per learning plan
 - plan import preview before writing files
 - daily reminders with the current learning topic
+- lightweight tutor mode for prompts like `teach me`, `continue learning`, `I don't understand`, `give me another example`, or `teacher mode`
 - `1 / 0 / low-power / 下课` interaction protocol
 - lightweight review with one-sentence understanding and small verification questions
 - plan progress and effective progress tracking
 - daily rescue tasks and weekly review
 
 It does not design a full curriculum from scratch by default. The user provides the learning plan; the skill normalizes, tracks, reminds, reviews, and adjusts pacing.
+
+## Tutor Mode
+
+`learning-companion` can now act as a lightweight teacher for the current learning item, not only as a tracker. When the learner asks to continue learning, asks for teaching, says they do not understand, or asks for another example, the skill reads the active dashboard and teaches the current topic in small steps.
+
+Tutor mode follows a compact pattern:
+
+1. explain the core idea in plain language
+2. connect it to the learner's plan, project, or source material
+3. give one concrete example
+4. point out one common misconception or boundary
+5. ask exactly one check question
+
+Tutor mode does not advance effective progress by itself. The learner still finishes with `下课`, and the normal close-out review scores mastery and updates the dashboard and log.
 
 ## Data Model
 
