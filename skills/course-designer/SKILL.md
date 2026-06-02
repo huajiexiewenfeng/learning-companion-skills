@@ -1,6 +1,7 @@
 ---
 name: course-designer
-description: Use when the user wants to design a personalized learning course before tracking it: clarify a learning goal or North Star, turn a vague study intention into a staged curriculum, create a sprint/day learning map, define outputs and verification standards, or produce a course package that can later be imported into learning-companion. Trigger on requests like "帮我定制课程", "我想学 X 该怎么规划", "帮我确认 North Star", "设计一个 90 天/150 天学习计划", "生成可导入 learning-companion 的课程", or similar course-design and self-learning planning requests.
+description: >-
+  Use when the user wants to design a personalized learning course before tracking it: clarify a learning goal or North Star, turn a vague study intention into a staged curriculum, create a sprint/day learning map, define outputs and verification standards, or produce a course package that can later be imported into learning-companion. Trigger on requests like "帮我定制课程", "我想学 X 该怎么规划", "帮我确认 North Star", "设计一个 90 天/150 天学习计划", "生成可导入 learning-companion 的课程", or similar course-design and self-learning planning requests.
 ---
 
 # Course Designer
