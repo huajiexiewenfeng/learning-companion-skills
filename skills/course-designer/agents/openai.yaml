@@ -1,0 +1,4 @@
+interface:
+  display_name: "Course Designer"
+  short_description: "Design personalized learning courses from goals and North Stars."
+  default_prompt: "Help me design a personalized learning course from my goal."

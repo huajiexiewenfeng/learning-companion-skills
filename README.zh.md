@@ -6,24 +6,46 @@
 
 ![Learning Companion Skills 工作流](assets/learning-companion-flow-zh.svg)
 
-这个项目的目标，是让 AI Agent 成为一个通用型学习管家，适用于技术、文学、哲学、语言、职业技能等长期学习计划。
+这个项目的目标，是让 AI Agent 支持长期自学，适用于技术、文学、哲学、语言、职业技能等学习计划。
 
 核心想法很简单：
 
 > 学习计划不应该散落在一个个聊天 session 里。
 
-这个仓库里的 skills 会把用户提供的学习计划转成可追踪的学习地图，为每个计划维护独立 dashboard，在提醒时带上当天学习内容，并在用户“下课”后做轻量验证和记录。
+这个仓库里的 skills 支持一个两段式学习流程：
 
-## MVP Skill
+```text
+course-designer
+-> 把目标变成个人定制课程
+
+learning-companion
+-> 跟踪、教学、复盘和记录课程
+```
+
+## Skills
 
 ```text
 skills/
+  course-designer/
   learning-companion/
 ```
 
+### `course-designer`
+
+用于学习正式开始前。
+
+它帮助用户把模糊学习意图变成一份个人定制课程包：确认 North Star，识别学习背景、时间和约束，设计阶段或 Sprint，定义可见产出和验收标准，并输出可交给 `learning-companion` 导入的课程预览。
+
+典型请求：
+
+- “我想学 AI，帮我设计课程。”
+- “帮我确认 North Star。”
+- “设计一个 90 天 / 150 天学习计划。”
+- “把这个目标变成可以导入 learning-companion 的课程。”
+
 ### `learning-companion`
 
-用于管理一个或多个长期学习计划。
+用于已有课程或学习计划之后。
 
 它支持：
 
@@ -36,7 +58,17 @@ skills/
 - 计划进度和有效进度同时追踪
 - 日级补救和周复盘
 
-它默认不从零设计课程。用户提供学习计划，skill 负责规范化、追踪、提醒、验证和节奏调整。
+它默认不从零设计课程。用户提供学习计划，或导入 `course-designer` 设计好的课程；skill 负责规范化、追踪、提醒、验证和节奏调整。
+
+## 推荐工作流
+
+```text
+1. 用 course-designer 确认 North Star。
+2. 预览个人定制课程包。
+3. 用户确认课程。
+4. 用 learning-companion 导入课程。
+5. 后续由 learning-companion 负责每日学习、老师模式、下课复盘、打分和进度追踪。
+```
 
 ## 老师模式
 
@@ -86,4 +118,4 @@ npx skills add .
 
 ## 状态
 
-MVP 草稿阶段。当前重点是先把一个通用学习管家 skill 做稳，再扩展更多专业化能力。
+早期草稿阶段。当前重点是先打通“个人定制课程设计 + 长期学习跟踪”的两段式学习流程。

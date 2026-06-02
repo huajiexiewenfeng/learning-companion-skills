@@ -6,24 +6,46 @@ AI skills for long-term learning plans, reminders, dashboards, and progress trac
 
 ![Learning Companion Skills workflow](assets/learning-companion-flow-en.svg)
 
-This project helps AI agents act as a lightweight learning companion for any subject: technology, literature, philosophy, language learning, professional skills, and more.
+This project helps AI agents support self-directed learning for any subject: technology, literature, philosophy, language learning, professional skills, and more.
 
 The core idea is simple:
 
 > A learning plan should not disappear into scattered chat sessions.
 
-The skills in this repository help convert a user-provided learning plan into a trackable map, keep one dashboard per plan, remind the learner with today's actual learning content, and record progress after a lightweight review.
+The skills in this repository support a two-step learning workflow:
 
-## MVP Skill
+```text
+course-designer
+-> turn a goal into a personalized course
+
+learning-companion
+-> track, teach, review, and record the course
+```
+
+## Skills
 
 ```text
 skills/
+  course-designer/
   learning-companion/
 ```
 
+### `course-designer`
+
+Use this skill before tracking starts.
+
+It helps turn a vague learning intention into a personalized course package by clarifying the learner's North Star, identifying constraints, designing stages or sprints, defining visible outputs and verification standards, and producing a `learning-companion` import preview.
+
+Typical requests:
+
+- "I want to learn AI. Help me design a course."
+- "Help me confirm my North Star."
+- "Design a 90-day / 150-day learning plan."
+- "Turn this goal into a course I can import into learning-companion."
+
 ### `learning-companion`
 
-Use this skill to manage one or more long-term learning plans.
+Use this skill after a course or learning plan exists.
 
 It supports:
 
@@ -36,7 +58,17 @@ It supports:
 - plan progress and effective progress tracking
 - daily rescue tasks and weekly review
 
-It does not design a full curriculum from scratch by default. The user provides the learning plan; the skill normalizes, tracks, reminds, reviews, and adjusts pacing.
+It does not design a full curriculum from scratch by default. The user provides the learning plan or imports one designed by `course-designer`; the skill normalizes, tracks, reminds, reviews, and adjusts pacing.
+
+## Recommended Workflow
+
+```text
+1. Use course-designer to clarify the North Star.
+2. Preview the personalized course package.
+3. Confirm the course.
+4. Import it with learning-companion.
+5. Use learning-companion for daily study, tutor mode, close-out review, scoring, and progress tracking.
+```
 
 ## Tutor Mode
 
@@ -86,4 +118,4 @@ Restart Codex or your agent runtime after installation so the skill can be redis
 
 ## Status
 
-MVP draft. The current focus is one reliable general-purpose learning companion skill before adding more specialized extensions.
+Early draft. The current focus is a reliable two-skill flow for personalized course design and long-term learning tracking.
