@@ -1,6 +1,6 @@
 ---
 name: learning-companion
-description: Use when the user wants to manage a long-term learning plan, create or update a learning dashboard, track study progress across sessions, receive study reminders, record "下课", review learning status, continue a study plan, or asks the assistant to teach today's learning content with phrases like "你来教我学习", "继续学习", "我不明白", "换个例子", or "老师模式".
+description: Use when the user wants to manage a long-term learning plan, create or update a learning dashboard, track study progress across sessions, receive study reminders, record "下课", review learning status, continue a study plan, view learning progress or refresh a static learning dashboard, or asks the assistant to teach or explain today's learning content.
 ---
 
 # Learning Companion
@@ -24,6 +24,8 @@ This skill may:
 - teach today's learning content in a lightweight tutor mode when requested
 - lightly verify understanding after "下课"
 - update progress and suggest pacing changes
+- summarize learning progress from local learning files
+- create or refresh a static HTML learning dashboard when requested
 
 This skill should not:
 
@@ -33,6 +35,8 @@ This skill should not:
 - add large external teaching content by default
 - turn tutor mode into a full curriculum generator unless explicitly asked
 - turn tracking into homework
+- treat the HTML learning dashboard as the source of truth
+- turn the static dashboard into a complex app
 
 ## Required References
 
@@ -41,6 +45,8 @@ Read the relevant reference before acting:
 - `references/plan-dashboard-format.md` when creating, previewing, or updating learning files.
 - `references/reminder-workflow.md` when handling reminders, `1`, `0`, low-power mode, or "下课".
 - `references/scoring-and-review.md` when judging completion, effective progress, rescue tasks, or weekly review.
+- `references/learning-console.md` when the user asks to view, create, refresh, or summarize the learning dashboard, learning panel, progress, stats, mastery, route map, course preview, or recent logs.
+- `references/learning-console-data-contract.md` when creating or refreshing `learning-console.html`.
 
 ## Default Data Location
 
@@ -49,6 +55,7 @@ In the target workspace:
 ```text
 learning-companion/
   index.md
+  learning-console.html              # optional static view
   plans/
     <plan-id>/
       dashboard.md
@@ -57,6 +64,8 @@ learning-companion/
 ```
 
 One learning plan gets one dashboard.
+
+The Markdown files are the source of truth. The optional `learning-console.html` is a generated static view.
 
 ## Hard Rules
 
@@ -67,6 +76,9 @@ One learning plan gets one dashboard.
 5. Ask at most one question at a time.
 6. Keep daily interaction low-friction.
 7. Track both plan progress and effective progress.
+8. Do not update effective progress from tutor mode alone.
+9. Do not make `learning-console.html` the source of truth.
+10. Do not add tutor-mode controls to the static HTML dashboard.
 
 ## Plan Creation Flow
 
@@ -84,6 +96,72 @@ When the user provides a learning plan:
    - map preview
    - reminder configuration preview
 4. Ask for confirmation before writing files or creating automations.
+
+If the user asks for a learning dashboard, preview that `learning-companion/learning-console.html` will be created from `references/learning-console-template.html`.
+
+## Static Dashboard Protocol
+
+Use dashboard-query mode when the user asks to view current learning status. Trigger examples:
+
+```text
+看下学习进度
+我的学习情况
+看一下学习面板
+看下 dashboard
+看今天学什么
+看下掌握度
+最近学了什么
+学习统计
+show my learning progress
+show today's learning item
+show mastery scores
+show recent study log
+```
+
+In dashboard-query mode:
+
+1. Read `learning-companion/index.md`.
+2. Resolve the active plan.
+3. Read `dashboard.md`, `map.md`, and `log.md`.
+4. Return a concise status summary.
+5. Mention `learning-companion/learning-console.html` if it exists.
+
+Do not update progress, map status, mastery, or logs in dashboard-query mode.
+
+Use dashboard-refresh mode when the user explicitly asks to refresh the learning panel or dashboard. Trigger examples:
+
+```text
+刷新学习面板
+更新学习面板
+更新学习看板
+刷新学习仪表盘
+refresh learning console
+update learning dashboard
+refresh dashboard
+```
+
+In dashboard-refresh mode:
+
+1. Read `references/learning-console.md`.
+2. Read `references/learning-console-data-contract.md`.
+3. Read the source Markdown files.
+4. Refresh only the `window.learningData` section in `learning-console.html` when possible.
+5. Preserve the HTML layout and render logic.
+6. Report the refreshed path and source files used.
+
+Use console-create mode when the user asks to create the learning panel. Create `learning-companion/learning-console.html` from `references/learning-console-template.html` only after the user asks or confirms.
+
+The static dashboard layout is intentionally limited to:
+
+```text
+学习仪表盘
+学习路线图
+学习日志
+课程内容预览
+进度与掌握
+```
+
+Do not add tutor-mode controls or complex app interactions to the static dashboard.
 
 ## Daily Protocol
 
@@ -117,7 +195,7 @@ Use tutor mode when the user asks for teaching, not just tracking. Trigger examp
 - `老师模式`
 - any request that asks the assistant to explain, teach, clarify, or continue today's learning topic
 
-Tutor mode should stay lightweight and tied to the current plan item. It is a teacher layer on top of the learning manager, not a replacement for the source material.
+Tutor mode should stay lightweight and tied to the current plan item. It is a teaching layer on top of the learning manager, not a replacement for the source material.
 
 When tutor mode starts:
 
@@ -143,6 +221,7 @@ Tutor mode must not:
 - introduce large external material unless the user asks
 - ask multiple questions at once
 - turn the session into homework
+- change the static HTML dashboard layout
 
 At the end of a tutor-mode response, invite the user to continue with one low-friction next step. If the user appears ready to finish, ask them to reply `下课` so the normal close-out review can score mastery and update progress.
 

@@ -57,6 +57,7 @@ It supports:
 - lightweight review with one-sentence understanding and small verification questions
 - plan progress and effective progress tracking
 - daily rescue tasks and weekly review
+- optional static HTML learning dashboard generated from Markdown files
 
 It does not design a full curriculum from scratch by default. The user provides the learning plan or imports one designed by `course-designer`; the skill normalizes, tracks, reminds, reviews, and adjusts pacing.
 
@@ -68,11 +69,35 @@ It does not design a full curriculum from scratch by default. The user provides 
 3. Confirm the course.
 4. Import it with learning-companion.
 5. Use learning-companion for daily study, tutor mode, close-out review, scoring, and progress tracking.
+6. Optionally create or refresh learning-console.html to view progress in a static dashboard.
 ```
+
+## Static Learning Dashboard
+
+`learning-companion` can create a standalone `learning-console.html` file in the learner's workspace. It is a static view, not a separate app.
+
+The dashboard focuses on five sections:
+
+- learning cockpit
+- course roadmap
+- learning log
+- course content preview
+- progress and mastery
+
+Typical requests:
+
+- "create learning dashboard"
+- "refresh learning dashboard"
+- "show my learning progress"
+- "看下学习进度"
+- "创建学习面板"
+- "刷新学习面板"
+
+The HTML file is not the source of truth. The skill reads Markdown files, builds `window.learningData`, and updates the dashboard view.
 
 ## Tutor Mode
 
-`learning-companion` can now act as a lightweight teacher for the current learning item, not only as a tracker. When the learner asks to continue learning, asks for teaching, says they do not understand, or asks for another example, the skill reads the active dashboard and teaches the current topic in small steps.
+`learning-companion` can act as a lightweight teacher for the current learning item, not only as a tracker. When the learner asks to continue learning, asks for teaching, says they do not understand, or asks for another example, the skill reads the active dashboard and teaches the current topic in small steps.
 
 Tutor mode follows a compact pattern:
 
@@ -93,11 +118,23 @@ Recommended structure in the target workspace:
 ```text
 learning-companion/
   index.md
+  learning-console.html              # optional static view
   plans/
     <plan-id>/
       dashboard.md
       map.md
       log.md
+```
+
+## Examples
+
+```text
+examples/
+  technical-learning/
+    dashboard.md
+    learning-console.html
+  philosophy-reading/
+    dashboard.md
 ```
 
 ## Install
@@ -118,4 +155,4 @@ Restart Codex or your agent runtime after installation so the skill can be redis
 
 ## Status
 
-Early draft. The current focus is a reliable two-skill flow for personalized course design and long-term learning tracking.
+Early draft. The current focus is a reliable two-skill flow for personalized course design, long-term learning tracking, and a simple static dashboard for progress visibility.

@@ -1,6 +1,6 @@
 # Learning Companion Skills
 
-一组用于长期学习计划管理的 AI Skills，支持提醒、Dashboard、进度追踪和轻量复盘。
+一组用于长期学习计划管理的 AI Skills，支持提醒、Dashboard、进度追踪、轻量复盘和静态学习看板。
 
 [English README](README.md)
 
@@ -57,6 +57,7 @@ skills/
 - 一句话理解 + 小题验证
 - 计划进度和有效进度同时追踪
 - 日级补救和周复盘
+- 可选的静态 HTML 学习看板，从 Markdown 学习文件生成
 
 它默认不从零设计课程。用户提供学习计划，或导入 `course-designer` 设计好的课程；skill 负责规范化、追踪、提醒、验证和节奏调整。
 
@@ -68,11 +69,35 @@ skills/
 3. 用户确认课程。
 4. 用 learning-companion 导入课程。
 5. 后续由 learning-companion 负责每日学习、老师模式、下课复盘、打分和进度追踪。
+6. 如需要可创建或刷新 learning-console.html，用静态看板查看学习进度。
 ```
+
+## 静态学习看板
+
+`learning-companion` 可以在学习者自己的 workspace 中生成一个独立的 `learning-console.html` 文件。它不是一个复杂系统，也不需要本地服务，只是一个静态展示页。
+
+看板重点展示五个模块：
+
+- 学习仪表盘
+- 学习路线图
+- 学习日志
+- 课程内容预览
+- 进度与掌握
+
+典型请求：
+
+- “看下学习进度”
+- “我的学习情况”
+- “创建学习面板”
+- “刷新学习面板”
+- “看今天学什么”
+- “看下掌握度”
+
+HTML 不是事实来源。skill 会读取 Markdown 文件，生成 `window.learningData`，再刷新静态看板。
 
 ## 老师模式
 
-`learning-companion` 现在不仅能追踪学习进度，也可以围绕当天学习项做轻量教学。当学习者要求继续学习、让 AI 来教、表示不明白，或要求换个例子时，skill 会读取当前 dashboard，并针对今天的主题小步讲解。
+`learning-companion` 不仅能追踪学习进度，也可以围绕当天学习项做轻量教学。当学习者要求继续学习、让 AI 来教、表示不明白，或要求换个例子时，skill 会读取当前 dashboard，并针对今天的主题小步讲解。
 
 老师模式使用一个紧凑流程：
 
@@ -93,11 +118,23 @@ skills/
 ```text
 learning-companion/
   index.md
+  learning-console.html              # 可选静态看板
   plans/
     <plan-id>/
       dashboard.md
       map.md
       log.md
+```
+
+## 示例
+
+```text
+examples/
+  technical-learning/
+    dashboard.md
+    learning-console.html
+  philosophy-reading/
+    dashboard.md
 ```
 
 ## 安装
@@ -118,4 +155,4 @@ npx skills add .
 
 ## 状态
 
-早期草稿阶段。当前重点是先打通“个人定制课程设计 + 长期学习跟踪”的两段式学习流程。
+早期草稿阶段。当前重点是先打通“个人定制课程设计 + 长期学习跟踪 + 静态学习看板”的轻量闭环。

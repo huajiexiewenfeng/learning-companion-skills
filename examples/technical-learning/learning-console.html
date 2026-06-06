@@ -1,0 +1,1013 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>学习看板</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --sidebar: #111827;
+      --sidebar-soft: #1f2937;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --text: #172033;
+      --muted: #667085;
+      --line: #d9dee8;
+      --green: #0f9f6e;
+      --green-dark: #057857;
+      --blue: #2563eb;
+      --blue-soft: #eff6ff;
+      --amber: #b45309;
+      --red: #b42318;
+      --shadow: 0 18px 45px rgba(24, 39, 75, .08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+      line-height: 1.5;
+    }
+
+    h1, h2, h3, p { margin: 0; letter-spacing: 0; }
+
+    .app-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 248px minmax(0, 1fr);
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 22px 18px;
+      background: var(--sidebar);
+      color: #e5e7eb;
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--green), var(--blue));
+      color: #fff;
+      font-weight: 800;
+      font-size: 13px;
+      flex: 0 0 auto;
+    }
+
+    .brand-title {
+      display: block;
+      font-size: 15px;
+      font-weight: 780;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .brand-subtitle {
+      display: block;
+      color: #9ca3af;
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 160px;
+    }
+
+    .nav-group {
+      display: grid;
+      gap: 6px;
+    }
+
+    .nav-label {
+      color: #9ca3af;
+      font-size: 11px;
+      text-transform: uppercase;
+      margin: 4px 8px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-height: 38px;
+      padding: 8px 10px;
+      border-radius: 7px;
+      color: #cbd5e1;
+      text-decoration: none;
+      font-size: 13px;
+    }
+
+    .nav-link:hover,
+    .nav-link.active {
+      background: var(--sidebar-soft);
+      color: #ffffff;
+    }
+
+    .nav-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: .78;
+      flex: 0 0 auto;
+    }
+
+    .sidebar-note {
+      margin-top: auto;
+      border: 1px solid rgba(255, 255, 255, .12);
+      border-radius: 8px;
+      padding: 12px;
+      background: rgba(255, 255, 255, .04);
+      color: #aab4c3;
+      font-size: 12px;
+    }
+
+    .sidebar-note strong {
+      display: block;
+      color: #ffffff;
+      font-size: 12px;
+      margin-bottom: 6px;
+    }
+
+    .main {
+      min-width: 0;
+      padding: 26px clamp(22px, 3vw, 44px) 42px;
+    }
+
+    .page {
+      width: min(100%, 1440px);
+      display: grid;
+      gap: 22px;
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 18px;
+      margin-bottom: 2px;
+    }
+
+    .page-title {
+      font-size: 28px;
+      line-height: 1.2;
+      font-weight: 820;
+    }
+
+    .page-subtitle {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 6px;
+    }
+
+    .section {
+      scroll-margin-top: 24px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .section-heading {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 18px;
+    }
+
+    .section-kicker {
+      color: var(--green-dark);
+      font-size: 13px;
+      font-weight: 760;
+    }
+
+    .section-title {
+      margin-top: 2px;
+      font-size: 24px;
+      line-height: 1.18;
+      font-weight: 820;
+    }
+
+    .section-desc {
+      color: var(--muted);
+      font-size: 14px;
+      max-width: 780px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .grid.two { grid-template-columns: minmax(0, 1.1fr) minmax(360px, .9fr); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      min-width: 0;
+    }
+
+    .panel-header {
+      min-height: 54px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .panel-header h3 {
+      font-size: 15px;
+      font-weight: 780;
+    }
+
+    .panel-header p {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 2px;
+    }
+
+    .panel-body { padding: 16px; }
+
+    .hero-panel {
+      padding: 20px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .plan-name {
+      font-size: clamp(30px, 3vw, 44px);
+      line-height: 1.1;
+      font-weight: 840;
+      max-width: 980px;
+    }
+
+    .plan-summary {
+      color: var(--muted);
+      font-size: 15px;
+      max-width: 860px;
+      margin-top: 5px;
+    }
+
+    .metric {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-soft);
+      padding: 14px;
+      min-width: 0;
+    }
+
+    .metric-label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 7px;
+    }
+
+    .metric-value {
+      font-size: 24px;
+      line-height: 1.12;
+      font-weight: 820;
+      overflow-wrap: anywhere;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      border-radius: 999px;
+      padding: 3px 9px;
+      font-size: 12px;
+      font-weight: 760;
+      background: #e0f2fe;
+      color: #075985;
+      white-space: nowrap;
+    }
+
+    .status-pill.green { background: #dcfce7; color: #166534; }
+    .status-pill.amber { background: #fef3c7; color: #92400e; }
+    .status-pill.red { background: #fee2e2; color: #991b1b; }
+    .status-pill.gray { background: #eef2f7; color: #475467; }
+
+    .roadmap {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(180px, 1fr));
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .lane {
+      min-width: 180px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-soft);
+      padding: 10px;
+    }
+
+    .lane-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 780;
+      margin-bottom: 10px;
+    }
+
+    .item-card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--blue);
+      border-radius: 7px;
+      padding: 9px;
+      margin-bottom: 8px;
+    }
+
+    .item-card.completed { border-left-color: var(--green); }
+    .item-card.rescue,
+    .item-card.blocked { border-left-color: var(--amber); }
+    .item-card.pending { border-left-color: #98a2b3; }
+
+    .item-title {
+      font-size: 13px;
+      font-weight: 760;
+    }
+
+    .item-meta {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 5px;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 10px;
+    }
+
+    .log-row {
+      display: grid;
+      grid-template-columns: 120px minmax(0, 1fr) 76px;
+      gap: 12px;
+      align-items: start;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-soft);
+      padding: 12px;
+    }
+
+    .log-date {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 720;
+    }
+
+    .log-title {
+      font-size: 14px;
+      font-weight: 780;
+    }
+
+    .log-text {
+      margin-top: 6px;
+      color: #344054;
+      font-size: 13px;
+    }
+
+    .preview-card {
+      border: 1px solid #bfdbfe;
+      background: var(--blue-soft);
+      border-radius: 8px;
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .preview-title {
+      font-size: 23px;
+      font-weight: 820;
+      line-height: 1.2;
+    }
+
+    .kv-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .kv {
+      border: 1px solid rgba(37, 99, 235, .18);
+      border-radius: 7px;
+      background: rgba(255, 255, 255, .72);
+      padding: 10px;
+    }
+
+    .kv-label {
+      color: var(--muted);
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    .kv-value {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .bars {
+      display: grid;
+      gap: 10px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: minmax(90px, 150px) minmax(0, 1fr) 44px;
+      gap: 10px;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .bar-track {
+      height: 9px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--green), var(--blue));
+    }
+
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tag {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 5px 9px;
+      background: var(--surface-soft);
+      color: #344054;
+      font-size: 12px;
+    }
+
+    .source-list {
+      display: grid;
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .source-item {
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 9px;
+      background: var(--surface-soft);
+      overflow-wrap: anywhere;
+    }
+
+    .footer {
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      padding: 10px 0 0;
+    }
+
+    @media (max-width: 1020px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .sidebar {
+        position: static;
+        height: auto;
+      }
+      .nav-group {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .grid.two,
+      .grid.three,
+      .grid.four { grid-template-columns: 1fr; }
+      .kv-grid { grid-template-columns: 1fr; }
+      .log-row { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .main { padding: 18px 14px 28px; }
+      .page-header { display: grid; }
+      .nav-group { grid-template-columns: 1fr; }
+      .plan-name { font-size: 28px; }
+      .metric-value { font-size: 21px; }
+      .bar-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">LC</div>
+        <div>
+          <span class="brand-title">学习看板</span>
+          <span class="brand-subtitle" id="navSubtitle">Markdown 数据驱动</span>
+        </div>
+      </div>
+
+      <nav class="nav-group" aria-label="页面导航">
+        <div class="nav-label">Dashboard</div>
+        <a class="nav-link active" href="#dashboard"><span class="nav-dot"></span>学习仪表盘</a>
+        <a class="nav-link" href="#roadmap"><span class="nav-dot"></span>学习路线图</a>
+        <a class="nav-link" href="#logs"><span class="nav-dot"></span>学习日志</a>
+        <a class="nav-link" href="#preview"><span class="nav-dot"></span>课程内容预览</a>
+        <a class="nav-link" href="#mastery"><span class="nav-dot"></span>进度与掌握</a>
+      </nav>
+
+      <div class="sidebar-note">
+        <strong>Source of truth</strong>
+        Markdown 文件是事实来源。这个 HTML 只是展示页，刷新时优先更新数据块。
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="page">
+        <header class="page-header">
+          <div>
+            <h1 class="page-title">学习进度总览</h1>
+            <p class="page-subtitle">静态 HTML · 本地 Markdown 数据 · Skill 自动刷新</p>
+          </div>
+          <span class="status-pill" id="planStatus">active</span>
+        </header>
+
+        <section class="section" id="dashboard">
+          <div class="section-heading">
+            <div>
+              <div class="section-kicker">01 / 学习仪表盘</div>
+              <h2 class="section-title">当前学习状态一屏看清</h2>
+              <p class="section-desc">展示当前课程、进度、有效进度、最近学习、下一步任务。</p>
+            </div>
+          </div>
+
+          <div class="panel hero-panel">
+            <div>
+              <h2 class="plan-name" id="planName">-</h2>
+              <p class="plan-summary" id="planSummary">-</p>
+            </div>
+            <div class="grid four">
+              <div class="metric">
+                <div class="metric-label">计划进度</div>
+                <div class="metric-value" id="planProgress">-</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">有效进度</div>
+                <div class="metric-value" id="effectiveProgress">-</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">平均掌握度</div>
+                <div class="metric-value" id="averageMastery">-</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">累计学习时长</div>
+                <div class="metric-value" id="totalStudyTime">-</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="roadmap">
+          <div>
+            <div class="section-kicker">02 / 学习路线图</div>
+            <h2 class="section-title">知道自己走到哪里</h2>
+            <p class="section-desc">路线图按状态分组展示课程项，让下一步和卡点足够清楚。</p>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>课程路线图</h3>
+                <p>Completed / Studying / Pending / Rescue / Blocked</p>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="roadmap" id="roadmapBoard"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="logs">
+          <div>
+            <div class="section-kicker">03 / 学习日志</div>
+            <h2 class="section-title">每次学习都留下证据</h2>
+            <p class="section-desc">重点记录：学了什么、理解到什么、得分多少、下一步怎么走。</p>
+          </div>
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>最近学习记录</h3>
+                <p>来自 active plan 的 log.md</p>
+              </div>
+            </div>
+            <div class="panel-body">
+              <div class="timeline" id="logTimeline"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="preview">
+          <div>
+            <div class="section-kicker">04 / 课程内容预览</div>
+            <h2 class="section-title">今天学什么，后面学什么</h2>
+            <p class="section-desc">展示当前课程项和后续内容，保持学习连续感。</p>
+          </div>
+          <div class="grid two">
+            <div class="preview-card">
+              <div>
+                <div class="section-kicker">当前内容</div>
+                <div class="preview-title" id="currentPreviewTitle">-</div>
+              </div>
+              <div class="kv-grid">
+                <div class="kv">
+                  <div class="kv-label">来源材料</div>
+                  <div class="kv-value" id="currentSourceMaterial">-</div>
+                </div>
+                <div class="kv">
+                  <div class="kv-label">最低完成标准</div>
+                  <div class="kv-value" id="currentMinimumCompletion">-</div>
+                </div>
+                <div class="kv">
+                  <div class="kv-label">验证方向</div>
+                  <div class="kv-value" id="currentVerification">-</div>
+                </div>
+                <div class="kv">
+                  <div class="kv-label">提醒状态</div>
+                  <div class="kv-value" id="currentReminderState">-</div>
+                </div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <h3>后续课程</h3>
+                  <p>展示接下来 3-5 个学习项</p>
+                </div>
+              </div>
+              <div class="panel-body">
+                <div id="upcomingList"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" id="mastery">
+          <div>
+            <div class="section-kicker">05 / 进度与掌握</div>
+            <h2 class="section-title">区分学过和真正掌握</h2>
+            <p class="section-desc">计划进度说明走到哪里，有效进度说明掌握到哪里。</p>
+          </div>
+          <div class="grid two">
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <h3>掌握度趋势</h3>
+                  <p>最近得分记录</p>
+                </div>
+              </div>
+              <div class="panel-body">
+                <div class="grid three" style="margin-bottom:14px;">
+                  <div class="metric">
+                    <div class="metric-label">有效天数</div>
+                    <div class="metric-value" id="effectiveDays">-</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">补救次数</div>
+                    <div class="metric-value" id="rescueCount">-</div>
+                  </div>
+                  <div class="metric">
+                    <div class="metric-label">最低得分</div>
+                    <div class="metric-value" id="lowestMastery">-</div>
+                  </div>
+                </div>
+                <div class="bars" id="masteryBars"></div>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-header">
+                <div>
+                  <h3>薄弱点与复习建议</h3>
+                  <p>仅展示日志中有证据的内容</p>
+                </div>
+              </div>
+              <div class="panel-body">
+                <div class="section-kicker" style="margin-bottom:8px;">薄弱点</div>
+                <div class="tag-list" id="weakPoints"></div>
+                <div class="section-kicker" style="margin:16px 0 8px;">复习建议</div>
+                <div class="source-list" id="reviewSuggestions"></div>
+                <div class="section-kicker" style="margin:16px 0 8px;">数据来源</div>
+                <div class="source-list" id="sourceList"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <footer class="footer">Learning Companion Static Dashboard · Markdown-backed · Skills-maintained</footer>
+      </div>
+    </main>
+  </div>
+
+  <script id="learning-data">
+    window.learningData = {
+      generatedAt: "2026-06-06 12:00",
+      workspace: "example-workspace",
+      sourceFiles: [
+        { label: "index.md", path: "learning-companion/index.md", role: "index", lastRead: "2026-06-06 12:00" },
+        { label: "dashboard.md", path: "learning-companion/plans/example/dashboard.md", role: "dashboard", lastRead: "2026-06-06 12:00" },
+        { label: "map.md", path: "learning-companion/plans/example/map.md", role: "map", lastRead: "2026-06-06 12:00" },
+        { label: "log.md", path: "learning-companion/plans/example/log.md", role: "log", lastRead: "2026-06-06 12:00" }
+      ],
+      plans: [
+        {
+          id: "agent-rag-knowledge-runtime",
+          name: "Agent/RAG Knowledge Runtime 转行计划",
+          status: "active",
+          schedule: "每周 5 天，每天 60-90 分钟",
+          planProgress: "Day 10 / 60",
+          effectiveProgress: "Day 10 / 60",
+          lastStudy: "2026-05-23",
+          nextStep: "Day 11：设计 chunk 表或文档结构"
+        }
+      ],
+      activePlanId: "agent-rag-knowledge-runtime",
+      dashboard: {
+        planName: "Agent/RAG Knowledge Runtime 转行计划",
+        status: "active",
+        planProgress: "Day 10 / 60",
+        effectiveProgress: "Day 10 / 60",
+        currentStrategy: "normal",
+        currentTopic: "Java RAG 服务：chunk 存储",
+        lastStudied: "2026-05-23",
+        recentContinuity: "Day 10 completed",
+        currentRisks: "范围较大，需要持续产出 demo，避免只看资料。",
+        nextStep: "Day 11：设计 chunk 表或文档结构"
+      },
+      today: {
+        day: "11",
+        topic: "Java RAG 服务：chunk 存储",
+        sourceMaterial: "主计划第 3-4 周",
+        minimumCompletion: "设计 chunk 表或文档结构",
+        verificationDirection: "说明 chunk 与原文如何追溯",
+        reminderState: "ready"
+      },
+      mapItems: [
+        { day: "1", stage: "阶段一", topic: "RAG 完整链路", sourceMaterial: "主计划第 1-4 节", minimumCompletion: "画出完整链路", verificationDirection: "解释 RAG、Memory、Context Builder 的区别", status: "completed" },
+        { day: "3", stage: "阶段一", topic: "token / context window / embedding", sourceMaterial: "自选资料", minimumCompletion: "解释上下文不是越多越好", verificationDirection: "举例说明 context pollution", status: "completed" },
+        { day: "10", stage: "阶段一", topic: "第一阶段复盘", sourceMaterial: "两个计划文档", minimumCompletion: "产出 10 个 RAG 测试问题", verificationDirection: "判断问题能否覆盖召回、引用、幻觉", status: "completed" },
+        { day: "11", stage: "阶段二", topic: "Java RAG 服务：chunk 存储", sourceMaterial: "主计划第 3-4 周", minimumCompletion: "设计 chunk 表或文档结构", verificationDirection: "说明 chunk 与原文如何追溯", status: "studying" },
+        { day: "12", stage: "阶段二", topic: "top-k 检索 API", sourceMaterial: "主计划第 3-4 周", minimumCompletion: "返回 top-k chunks 和 metadata", verificationDirection: "解释 top-k 结果如何被 agent 使用", status: "pending" }
+      ],
+      logEntries: [
+        { date: "2026-05-23", day: "10", state: "completed", topic: "第一阶段复盘", oneSentenceUnderstanding: "RAG eval cases 用来覆盖召回、过滤、上下文构建、citation 和工程链路风险。", verification: "Produced 10 Stage 1 RAG eval questions and JSON eval cases.", mastery: "5/5", studyTime: "unknown", planProgressChange: "Day 10 / 60 completed", effectiveProgressChange: "Day 10 / 60 completed", risk: "后续需要把 eval cases 接入真实 demo 或脚本。", nextStrategy: "进入 Day 11：chunk 存储。", evidence: "log.md#2026-05-23-Day-10" },
+        { date: "2026-05-23", day: "9", state: "completed", topic: "HTTP/API 设计", oneSentenceUnderstanding: "ingest 是长任务，query 返回 answer + citations；无证据时返回 insufficient_evidence。", verification: "Explained timeout, idempotency, insufficient evidence.", mastery: "4/5", studyTime: "unknown", planProgressChange: "Day 9 / 60 completed", effectiveProgressChange: "Day 9 / 60 completed", risk: "需要继续推进接口草图和错误模型。", nextStrategy: "进入 Day 10：第一阶段复盘。", evidence: "log.md#2026-05-23-Day-9" }
+      ],
+      contentPreview: {
+        current: {
+          day: "11",
+          title: "Java RAG 服务：chunk 存储",
+          sourceMaterial: "主计划第 3-4 周",
+          minimumCompletion: "设计 chunk 表或文档结构",
+          verificationDirection: "说明 chunk 与原文如何追溯",
+          reminderState: "ready"
+        },
+        upcoming: [
+          { day: "12", title: "top-k 检索 API", status: "pending" },
+          { day: "13", title: "引用和证据返回", status: "pending" },
+          { day: "14", title: "RAG API 错误模型", status: "pending" }
+        ]
+      },
+      masteryStats: {
+        completedDays: 10,
+        effectiveDays: 10,
+        scoredEntries: 10,
+        averageMastery: 4.15,
+        highestMastery: 5,
+        lowestMastery: 3.5,
+        rescueCount: 0,
+        weakPoints: ["context pollution", "API error model"],
+        reviewSuggestions: ["复盘 Day 3 的 context window", "把 Day 9 的错误模型补成接口草图"],
+        recentScores: [
+          { day: "1", topic: "RAG 完整链路", mastery: 4 },
+          { day: "2", topic: "Agent Knowledge Runtime", mastery: 4 },
+          { day: "3", topic: "token / context / embedding", mastery: 3.5 },
+          { day: "10", topic: "第一阶段复盘", mastery: 5 }
+        ]
+      },
+      studyTimeStats: {
+        totalMinutes: null,
+        averageMinutes: null,
+        entriesWithTime: 0,
+        entriesMissingTime: 10,
+        note: "Legacy logs may not include Study time."
+      }
+    };
+  </script>
+
+  <script>
+    function byId(id) {
+      return document.getElementById(id);
+    }
+
+    function text(id, value) {
+      const node = byId(id);
+      if (node) node.textContent = value || "-";
+    }
+
+    function statusClass(status) {
+      const normalized = String(status || "").toLowerCase();
+      if (["completed", "done", "active"].includes(normalized)) return "green";
+      if (["rescue", "blocked"].includes(normalized)) return "amber";
+      if (["failed"].includes(normalized)) return "red";
+      if (["pending", "unknown", "skipped"].includes(normalized)) return "gray";
+      return "";
+    }
+
+    function formatStudyTime(stats) {
+      if (!stats || stats.totalMinutes == null) return "unknown";
+      if (stats.totalMinutes < 60) return `${stats.totalMinutes} min`;
+      const hours = Math.floor(stats.totalMinutes / 60);
+      const minutes = stats.totalMinutes % 60;
+      return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
+    }
+
+    function getGroups(items) {
+      const groups = { completed: [], studying: [], pending: [], rescue: [], blocked: [] };
+      for (const item of items || []) {
+        const status = item.status || "pending";
+        if (groups[status]) groups[status].push(item);
+        else groups.pending.push(item);
+      }
+      return groups;
+    }
+
+    function renderRoadmap(items) {
+      const board = byId("roadmapBoard");
+      if (!board) return;
+      const groups = getGroups(items);
+      const labels = {
+        completed: "已完成",
+        studying: "进行中",
+        pending: "未开始",
+        rescue: "需补救",
+        blocked: "阻塞"
+      };
+      board.innerHTML = Object.keys(labels).map(key => {
+        const cards = groups[key].map(item => `
+          <div class="item-card ${item.status || key}">
+            <div class="item-title">Day ${item.day || "-"} · ${item.topic || "-"}</div>
+            <div class="item-meta">${item.stage || ""}</div>
+            <div class="item-meta">${item.minimumCompletion || ""}</div>
+          </div>
+        `).join("");
+        return `
+          <div class="lane">
+            <div class="lane-title"><span>${labels[key]}</span><span>${groups[key].length}</span></div>
+            ${cards || '<div class="item-card pending"><div class="item-title">暂无</div></div>'}
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderLogs(entries) {
+      const timeline = byId("logTimeline");
+      if (!timeline) return;
+      timeline.innerHTML = (entries || []).map(entry => `
+        <div class="log-row">
+          <div class="log-date">${entry.date || "-"}<br>Day ${entry.day || "-"}</div>
+          <div>
+            <div class="log-title">${entry.topic || "-"}</div>
+            <div class="log-text">${entry.oneSentenceUnderstanding || ""}</div>
+            <div class="log-text"><strong>风险：</strong>${entry.risk || "-"}</div>
+            <div class="log-text"><strong>下一步：</strong>${entry.nextStrategy || "-"}</div>
+          </div>
+          <span class="status-pill ${statusClass(entry.state)}">${entry.mastery || "未评分"}</span>
+        </div>
+      `).join("");
+    }
+
+    function renderUpcoming(items) {
+      const list = byId("upcomingList");
+      if (!list) return;
+      list.innerHTML = (items || []).map(item => `
+        <div class="item-card ${item.status || "pending"}">
+          <div class="item-title">Day ${item.day || "-"} · ${item.title || item.topic || "-"}</div>
+          <div class="item-meta">${item.status || "pending"}</div>
+        </div>
+      `).join("") || '<div class="item-card pending"><div class="item-title">暂无后续内容</div></div>';
+    }
+
+    function renderMasteryBars(scores) {
+      const bars = byId("masteryBars");
+      if (!bars) return;
+      bars.innerHTML = (scores || []).map(score => {
+        const mastery = Number(score.mastery || 0);
+        const pct = Math.max(0, Math.min(100, mastery / 5 * 100));
+        return `
+          <div class="bar-row">
+            <div>Day ${score.day}</div>
+            <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+            <div>${mastery}/5</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function renderTags(id, values, fallback) {
+      const node = byId(id);
+      if (!node) return;
+      const list = values && values.length ? values : [fallback];
+      node.innerHTML = list.map(value => `<span class="tag">${value}</span>`).join("");
+    }
+
+    function renderSuggestions(values) {
+      const node = byId("reviewSuggestions");
+      if (!node) return;
+      const list = values && values.length ? values : ["暂无明确复习建议"];
+      node.innerHTML = list.map(value => `<div class="source-item">${value}</div>`).join("");
+    }
+
+    function renderSources(files, generatedAt) {
+      const node = byId("sourceList");
+      if (!node) return;
+      const rows = (files || []).map(file => `
+        <div class="source-item">
+          <strong>${file.label || file.role || "source"}</strong><br>
+          ${file.path || "-"}<br>
+          <span style="color: var(--muted);">Last read: ${file.lastRead || "-"}</span>
+        </div>
+      `).join("");
+      node.innerHTML = `
+        <div class="source-item"><strong>Last refreshed</strong><br>${generatedAt || "-"}</div>
+        ${rows}
+      `;
+    }
+
+    function render() {
+      const data = window.learningData || {};
+      const dashboard = data.dashboard || {};
+      const today = data.today || {};
+      const preview = data.contentPreview || {};
+      const current = preview.current || today || {};
+      const mastery = data.masteryStats || {};
+      const studyTime = data.studyTimeStats || {};
+
+      text("navSubtitle", `${data.workspace || "workspace"} · ${data.generatedAt || "-"}`);
+      text("planStatus", dashboard.status || "unknown");
+      const statusNode = byId("planStatus");
+      if (statusNode) statusNode.className = `status-pill ${statusClass(dashboard.status)}`;
+      text("planName", dashboard.planName || "No active plan");
+      text("planSummary", dashboard.nextStep || dashboard.currentTopic || "");
+      text("planProgress", dashboard.planProgress);
+      text("effectiveProgress", dashboard.effectiveProgress);
+      text("averageMastery", mastery.averageMastery == null ? "-" : `${mastery.averageMastery}/5`);
+      text("totalStudyTime", formatStudyTime(studyTime));
+
+      text("currentPreviewTitle", current.title || (current.day ? `Day ${current.day} · ${current.topic || ""}` : current.topic));
+      text("currentSourceMaterial", current.sourceMaterial);
+      text("currentMinimumCompletion", current.minimumCompletion);
+      text("currentVerification", current.verificationDirection);
+      text("currentReminderState", current.reminderState);
+
+      text("effectiveDays", mastery.effectiveDays == null ? "-" : String(mastery.effectiveDays));
+      text("rescueCount", mastery.rescueCount == null ? "-" : String(mastery.rescueCount));
+      text("lowestMastery", mastery.lowestMastery == null ? "-" : `${mastery.lowestMastery}/5`);
+
+      renderRoadmap(data.mapItems || []);
+      renderLogs(data.logEntries || []);
+      renderUpcoming(preview.upcoming || []);
+      renderMasteryBars(mastery.recentScores || []);
+      renderTags("weakPoints", mastery.weakPoints, "暂无明确薄弱点");
+      renderSuggestions(mastery.reviewSuggestions);
+      renderSources(data.sourceFiles || [], data.generatedAt);
+    }
+
+    render();
+  </script>
+</body>
+</html>
