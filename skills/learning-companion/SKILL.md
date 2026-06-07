@@ -45,7 +45,7 @@ Read the relevant reference before acting:
 
 - `references/plan-dashboard-format.md` when creating, previewing, or updating learning files.
 - `references/reminder-workflow.md` when handling reminders, `1`, `0`, low-power mode, or "下课".
-- `references/scoring-and-review.md` when judging completion, effective progress, rescue tasks, or weekly review.
+- `references/scoring-and-review.md` when judging completion, effective progress, low-score review tasks, or weekly review.
 - `references/learning-console.md` when the user asks to view, create, refresh, or summarize the learning dashboard, learning panel, progress, stats, mastery, route map, course preview, or recent logs.
 - `references/learning-console-data-contract.md` when creating or refreshing `learning-console.html`.
 
@@ -234,7 +234,7 @@ At the end of a tutor-mode response, invite the user to continue with one low-fr
 
 `effective progress` means the item reached at least 3/5 mastery.
 
-If mastery is below 3/5, pause new progress and assign a rescue task that returns to the user's original material.
+If mastery is below 3/5, pause effective progress and assign a focused review task that returns to the user's original material.
 
 ## Reminder Style
 

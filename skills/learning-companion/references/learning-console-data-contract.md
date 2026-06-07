@@ -19,8 +19,7 @@ window.learningData = {
   mapItems: [],
   logEntries: [],
   contentPreview: {},
-  masteryStats: {},
-  studyTimeStats: {}
+  masteryStats: {}
 };
 </script>
 ```
@@ -40,7 +39,6 @@ window.learningData = {
 | `logEntries` | array | yes | Learning log entries. |
 | `contentPreview` | object | yes | Current and upcoming course content. |
 | `masteryStats` | object | yes | Mastery summary. |
-| `studyTimeStats` | object | yes | Study-time summary. |
 
 ## sourceFiles
 
@@ -90,7 +88,6 @@ Allowed `currentStrategy` values:
 ```text
 normal
 light review
-rescue
 reconnect
 paused
 stage reorder proposed
@@ -139,10 +136,8 @@ Allowed `status` values:
 
 ```text
 pending
-studying
+current
 completed
-rescue
-blocked
 skipped
 unknown
 ```
@@ -158,23 +153,12 @@ unknown
   oneSentenceUnderstanding: "",
   verification: "",
   mastery: "5/5",
-  studyTime: "",
   planProgressChange: "",
   effectiveProgressChange: "",
   risk: "",
   nextStrategy: "",
   evidence: ""
 }
-```
-
-`studyTime` is optional for legacy logs. New logs should include it when available.
-
-Recommended format:
-
-```text
-60 min
-1h 20m
-unknown
 ```
 
 ## contentPreview
@@ -205,7 +189,6 @@ unknown
   averageMastery: 4.15,
   highestMastery: 5,
   lowestMastery: 3.5,
-  rescueCount: 0,
   weakPoints: ["context pollution", "API error model"],
   reviewSuggestions: ["复盘 Day 3 的 context window"],
   recentScores: [
@@ -215,20 +198,6 @@ unknown
 }
 ```
 
-## studyTimeStats
-
-```javascript
-{
-  totalMinutes: null,
-  averageMinutes: null,
-  entriesWithTime: 0,
-  entriesMissingTime: 10,
-  note: "Legacy logs may not include Study time."
-}
-```
-
-Use `null` when time cannot be calculated.
-
 ## Data Update Rules
 
 When refreshing the console:
@@ -237,17 +206,16 @@ When refreshing the console:
 2. Parse active `dashboard.md` into `dashboard` and `today`.
 3. Parse active `map.md` into `mapItems` and `contentPreview.upcoming`.
 4. Parse active `log.md` into `logEntries`.
-5. Derive `masteryStats` and `studyTimeStats`.
+5. Derive `masteryStats` only from scored learning logs.
 6. Update `generatedAt` and `sourceFiles`.
 7. Preserve HTML, CSS, and render logic.
 
-Do not infer mastery or study time when the log does not contain evidence.
+Do not infer mastery when the log does not contain evidence.
 
 ## Backward Compatibility
 
 Legacy logs may not include:
 
-- `Study time`
 - `Evidence`
 - `contentPreview`
 

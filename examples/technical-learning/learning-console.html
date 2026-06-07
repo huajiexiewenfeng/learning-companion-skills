@@ -348,8 +348,6 @@
     }
 
     .item-card.completed { border-left-color: var(--green); }
-    .item-card.rescue,
-    .item-card.blocked { border-left-color: var(--amber); }
     .item-card.pending { border-left-color: #98a2b3; }
 
     .item-title {
@@ -587,8 +585,8 @@
                 <div class="metric-value" id="averageMastery">-</div>
               </div>
               <div class="metric">
-                <div class="metric-label">累计学习时长</div>
-                <div class="metric-value" id="totalStudyTime">-</div>
+                <div class="metric-label">最近学习</div>
+                <div class="metric-value" id="lastStudied">-</div>
               </div>
             </div>
           </div>
@@ -604,7 +602,7 @@
             <div class="panel-header">
               <div>
                 <h3>课程路线图</h3>
-                <p>Completed / Studying / Pending / Rescue / Blocked</p>
+                <p>Completed / Current / Pending</p>
               </div>
             </div>
             <div class="panel-body">
@@ -698,8 +696,8 @@
                     <div class="metric-value" id="effectiveDays">-</div>
                   </div>
                   <div class="metric">
-                    <div class="metric-label">补救次数</div>
-                    <div class="metric-value" id="rescueCount">-</div>
+                    <div class="metric-label">已完成天数</div>
+                    <div class="metric-value" id="completedDays">-</div>
                   </div>
                   <div class="metric">
                     <div class="metric-label">最低得分</div>
@@ -780,7 +778,7 @@
         { day: "1", stage: "阶段一", topic: "RAG 完整链路", sourceMaterial: "主计划第 1-4 节", minimumCompletion: "画出完整链路", verificationDirection: "解释 RAG、Memory、Context Builder 的区别", status: "completed" },
         { day: "3", stage: "阶段一", topic: "token / context window / embedding", sourceMaterial: "自选资料", minimumCompletion: "解释上下文不是越多越好", verificationDirection: "举例说明 context pollution", status: "completed" },
         { day: "10", stage: "阶段一", topic: "第一阶段复盘", sourceMaterial: "两个计划文档", minimumCompletion: "产出 10 个 RAG 测试问题", verificationDirection: "判断问题能否覆盖召回、引用、幻觉", status: "completed" },
-        { day: "11", stage: "阶段二", topic: "Java RAG 服务：chunk 存储", sourceMaterial: "主计划第 3-4 周", minimumCompletion: "设计 chunk 表或文档结构", verificationDirection: "说明 chunk 与原文如何追溯", status: "studying" },
+        { day: "11", stage: "阶段二", topic: "Java RAG 服务：chunk 存储", sourceMaterial: "主计划第 3-4 周", minimumCompletion: "设计 chunk 表或文档结构", verificationDirection: "说明 chunk 与原文如何追溯", status: "current" },
         { day: "12", stage: "阶段二", topic: "top-k 检索 API", sourceMaterial: "主计划第 3-4 周", minimumCompletion: "返回 top-k chunks 和 metadata", verificationDirection: "解释 top-k 结果如何被 agent 使用", status: "pending" }
       ],
       logEntries: [
@@ -809,7 +807,6 @@
         averageMastery: 4.15,
         highestMastery: 5,
         lowestMastery: 3.5,
-        rescueCount: 0,
         weakPoints: ["context pollution", "API error model"],
         reviewSuggestions: ["复盘 Day 3 的 context window", "把 Day 9 的错误模型补成接口草图"],
         recentScores: [
@@ -818,13 +815,6 @@
           { day: "3", topic: "token / context / embedding", mastery: 3.5 },
           { day: "10", topic: "第一阶段复盘", mastery: 5 }
         ]
-      },
-      studyTimeStats: {
-        totalMinutes: null,
-        averageMinutes: null,
-        entriesWithTime: 0,
-        entriesMissingTime: 10,
-        note: "Legacy logs may not include Study time."
       }
     };
   </script>
@@ -842,24 +832,15 @@
     function statusClass(status) {
       const normalized = String(status || "").toLowerCase();
       if (["completed", "done", "active"].includes(normalized)) return "green";
-      if (["rescue", "blocked"].includes(normalized)) return "amber";
       if (["failed"].includes(normalized)) return "red";
       if (["pending", "unknown", "skipped"].includes(normalized)) return "gray";
       return "";
     }
 
-    function formatStudyTime(stats) {
-      if (!stats || stats.totalMinutes == null) return "unknown";
-      if (stats.totalMinutes < 60) return `${stats.totalMinutes} min`;
-      const hours = Math.floor(stats.totalMinutes / 60);
-      const minutes = stats.totalMinutes % 60;
-      return minutes ? `${hours}h ${minutes}m` : `${hours}h`;
-    }
-
     function getGroups(items) {
-      const groups = { completed: [], studying: [], pending: [], rescue: [], blocked: [] };
+      const groups = { completed: [], current: [], pending: [] };
       for (const item of items || []) {
-        const status = item.status || "pending";
+        const status = item.status === "studying" ? "current" : item.status || "pending";
         if (groups[status]) groups[status].push(item);
         else groups.pending.push(item);
       }
@@ -872,10 +853,8 @@
       const groups = getGroups(items);
       const labels = {
         completed: "已完成",
-        studying: "进行中",
-        pending: "未开始",
-        rescue: "需补救",
-        blocked: "阻塞"
+        current: "当前",
+        pending: "未开始"
       };
       board.innerHTML = Object.keys(labels).map(key => {
         const cards = groups[key].map(item => `
@@ -975,7 +954,6 @@
       const preview = data.contentPreview || {};
       const current = preview.current || today || {};
       const mastery = data.masteryStats || {};
-      const studyTime = data.studyTimeStats || {};
 
       text("navSubtitle", `${data.workspace || "workspace"} · ${data.generatedAt || "-"}`);
       text("planStatus", dashboard.status || "unknown");
@@ -986,7 +964,7 @@
       text("planProgress", dashboard.planProgress);
       text("effectiveProgress", dashboard.effectiveProgress);
       text("averageMastery", mastery.averageMastery == null ? "-" : `${mastery.averageMastery}/5`);
-      text("totalStudyTime", formatStudyTime(studyTime));
+      text("lastStudied", dashboard.lastStudied || "-");
 
       text("currentPreviewTitle", current.title || (current.day ? `Day ${current.day} · ${current.topic || ""}` : current.topic));
       text("currentSourceMaterial", current.sourceMaterial);
@@ -995,7 +973,7 @@
       text("currentReminderState", current.reminderState);
 
       text("effectiveDays", mastery.effectiveDays == null ? "-" : String(mastery.effectiveDays));
-      text("rescueCount", mastery.rescueCount == null ? "-" : String(mastery.rescueCount));
+      text("completedDays", mastery.completedDays == null ? "-" : String(mastery.completedDays));
       text("lowestMastery", mastery.lowestMastery == null ? "-" : `${mastery.lowestMastery}/5`);
 
       renderRoadmap(data.mapItems || []);

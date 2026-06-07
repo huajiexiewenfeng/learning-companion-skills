@@ -170,17 +170,14 @@ Shows the active plan state:
 - current topic
 - last studied
 - next step
-- total study time when available
 
 ### 学习路线图
 
-Shows course items grouped by learning stage or status:
+Shows course items grouped by simple learning status:
 
 - completed
-- studying
+- current
 - pending
-- rescue
-- blocked
 
 ### 学习日志
 
@@ -190,7 +187,6 @@ Shows recent learning records:
 - day
 - topic
 - mastery
-- study time
 - one-sentence understanding
 - risk
 - next strategy
@@ -215,8 +211,6 @@ Shows lightweight statistics:
 - average mastery
 - highest mastery
 - lowest mastery
-- rescue count
-- total study time
 - weak points and review suggestions when evidence exists
 
 ## Update Rules

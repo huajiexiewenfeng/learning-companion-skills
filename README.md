@@ -56,7 +56,7 @@ It supports:
 - `1 / 0 / low-power / 下课` interaction protocol
 - lightweight review with one-sentence understanding and small verification questions
 - plan progress and effective progress tracking
-- daily rescue tasks and weekly review
+- low-score review tasks and weekly review
 - static HTML learning dashboard generated from Markdown files after plan import
 
 It does not design a full curriculum from scratch by default. The user provides the learning plan or imports one designed by `course-designer`; the skill normalizes, tracks, reminds, reviews, and adjusts pacing.
