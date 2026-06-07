@@ -6,6 +6,18 @@ AI skills for long-term learning plans, reminders, dashboards, and progress trac
 
 ![Learning Companion Skills workflow](assets/learning-companion-flow-en.svg)
 
+## Preview
+
+After a learning plan is imported, `learning-companion` creates a local static learning dashboard by default:
+
+![Learning cockpit and course roadmap](assets/learning-console-cockpit-roadmap.png)
+
+The dashboard also shows course preview, learning logs, progress and mastery, and source evidence:
+
+![Course preview, learning log, and source evidence](assets/learning-console-content-log.png)
+
+The HTML dashboard is not the source of truth. Markdown files remain the source of truth. When the learner replies `1` to start studying or `下课` to close out a session, an existing dashboard refreshes its `window.learningData` block automatically.
+
 This project helps AI agents support self-directed learning for any subject: technology, literature, philosophy, language learning, professional skills, and more.
 
 The core idea is simple:
@@ -70,7 +82,7 @@ It does not design a full curriculum from scratch by default. The user provides 
 4. Import it with learning-companion.
 5. Use learning-companion for daily study, tutor mode, close-out review, scoring, and progress tracking.
 6. After import, learning-companion creates learning-console.html by default.
-7. Refresh learning-console.html when learning records change and the learner wants to update the view.
+7. When the learner replies `1` to start studying or `下课` to close out a session, an existing learning-console.html refreshes its data block automatically.
 ```
 
 ## Static Learning Dashboard
@@ -95,7 +107,7 @@ Typical requests:
 - "创建学习面板"
 - "刷新学习面板"
 
-The HTML file is not the source of truth. The skill reads Markdown files, builds `window.learningData`, and updates the dashboard view.
+The HTML file is not the source of truth. The skill reads Markdown files, builds `window.learningData`, and updates the dashboard view. Automatic refresh updates only the data block, not the HTML layout, CSS, or render logic.
 
 ## Tutor Mode
 

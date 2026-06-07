@@ -6,6 +6,18 @@
 
 ![Learning Companion Skills 工作流](assets/learning-companion-flow-zh.svg)
 
+## 效果预览
+
+导入学习计划后，`learning-companion` 会默认生成一个本地静态学习看板：
+
+![学习仪表盘与学习路线图](assets/learning-console-cockpit-roadmap.png)
+
+看板会继续展示课程内容预览、学习日志、进度与掌握、数据来源等信息：
+
+![课程内容预览、学习日志与数据来源](assets/learning-console-content-log.png)
+
+HTML 看板不是事实来源。事实来源仍然是本地 Markdown 文件；当用户回复 `1` 开始学习或回复 `下课` 完成复盘后，如果看板已经存在，skill 会自动刷新 `window.learningData` 数据块。
+
 这个项目的目标，是让 AI Agent 支持长期自学，适用于技术、文学、哲学、语言、职业技能等学习计划。
 
 核心想法很简单：
@@ -70,7 +82,7 @@ skills/
 4. 用 learning-companion 导入课程。
 5. 后续由 learning-companion 负责每日学习、老师模式、下课复盘、打分和进度追踪。
 6. 导入完成后，learning-companion 默认生成 learning-console.html。
-7. 后续学习记录变化后，如需要可刷新 learning-console.html。
+7. 后续回复 `1` 开始学习或 `下课` 完成复盘后，已存在的 learning-console.html 会自动刷新数据块。
 ```
 
 ## 静态学习看板
@@ -95,7 +107,7 @@ skills/
 - “看今天学什么”
 - “看下掌握度”
 
-HTML 不是事实来源。skill 会读取 Markdown 文件，生成 `window.learningData`，再刷新静态看板。
+HTML 不是事实来源。skill 会读取 Markdown 文件，生成 `window.learningData`，再刷新静态看板。自动刷新只更新数据块，不重写 HTML 布局、CSS 或渲染逻辑。
 
 ## 老师模式
 
