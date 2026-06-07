@@ -124,7 +124,7 @@ Do not create learning progress that is not backed by Markdown evidence.
 
 ### console-create
 
-Use when the user asks to create a learning console.
+Use when a learning plan import is confirmed, or when the user asks to create a learning console.
 
 Trigger examples:
 
@@ -138,11 +138,12 @@ create learning dashboard
 Behavior:
 
 1. Confirm the target workspace if ambiguous.
-2. Create `learning-companion/learning-console.html` from `learning-console-template.html`.
-3. Fill the starter `window.learningData` from existing Markdown files.
+2. Create `learning-companion/learning-console.html` from `learning-console-template.html` by default after plan import.
+3. Fill the starter `window.learningData` from the imported Markdown files.
 4. Keep starter values conservative when evidence is incomplete.
+5. If `learning-console.html` already exists, preserve its layout and refresh only `window.learningData` unless the user confirms replacement.
 
-Do not silently create the console during ordinary study or close-out review unless the user has requested or confirmed it.
+Do not silently create the console during ordinary study or close-out review. The default creation rule applies to confirmed plan import.
 
 ## Layout Contract
 
@@ -223,7 +224,7 @@ Shows lightweight statistics:
 Update the console only when one of these happens:
 
 - user explicitly asks to create or refresh the learning console
-- a plan is created and the user confirms console creation
+- a plan is imported or created after user confirmation
 - a close-out review changes dashboard/log state and the user asks to refresh the console
 - weekly review changes dashboard/log state and the user asks to refresh the console
 

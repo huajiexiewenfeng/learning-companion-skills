@@ -57,7 +57,7 @@ skills/
 - 一句话理解 + 小题验证
 - 计划进度和有效进度同时追踪
 - 日级补救和周复盘
-- 可选的静态 HTML 学习看板，从 Markdown 学习文件生成
+- 导入计划后默认生成静态 HTML 学习看板，从 Markdown 学习文件生成
 
 它默认不从零设计课程。用户提供学习计划，或导入 `course-designer` 设计好的课程；skill 负责规范化、追踪、提醒、验证和节奏调整。
 
@@ -69,12 +69,13 @@ skills/
 3. 用户确认课程。
 4. 用 learning-companion 导入课程。
 5. 后续由 learning-companion 负责每日学习、老师模式、下课复盘、打分和进度追踪。
-6. 如需要可创建或刷新 learning-console.html，用静态看板查看学习进度。
+6. 导入完成后，learning-companion 默认生成 learning-console.html。
+7. 后续学习记录变化后，如需要可刷新 learning-console.html。
 ```
 
 ## 静态学习看板
 
-`learning-companion` 可以在学习者自己的 workspace 中生成一个独立的 `learning-console.html` 文件。它不是一个复杂系统，也不需要本地服务，只是一个静态展示页。
+`learning-companion` 会在学习计划导入后，在学习者自己的 workspace 中默认生成一个独立的 `learning-console.html` 文件。它不是一个复杂系统，也不需要本地服务，只是一个静态展示页。
 
 看板重点展示五个模块：
 
@@ -86,6 +87,7 @@ skills/
 
 典型请求：
 
+- “导入这个计划到 learning-companion”
 - “看下学习进度”
 - “我的学习情况”
 - “创建学习面板”
@@ -118,7 +120,7 @@ HTML 不是事实来源。skill 会读取 Markdown 文件，生成 `window.learn
 ```text
 learning-companion/
   index.md
-  learning-console.html              # 可选静态看板
+  learning-console.html              # 导入计划后默认生成的静态看板
   plans/
     <plan-id>/
       dashboard.md

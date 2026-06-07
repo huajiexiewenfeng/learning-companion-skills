@@ -25,7 +25,8 @@ This skill may:
 - lightly verify understanding after "下课"
 - update progress and suggest pacing changes
 - summarize learning progress from local learning files
-- create or refresh a static HTML learning dashboard when requested
+- create the static HTML learning dashboard by default after a plan is imported
+- refresh the static HTML learning dashboard when requested
 
 This skill should not:
 
@@ -55,7 +56,7 @@ In the target workspace:
 ```text
 learning-companion/
   index.md
-  learning-console.html              # optional static view
+  learning-console.html              # static view created by default after import
   plans/
     <plan-id>/
       dashboard.md
@@ -65,7 +66,7 @@ learning-companion/
 
 One learning plan gets one dashboard.
 
-The Markdown files are the source of truth. The optional `learning-console.html` is a generated static view.
+The Markdown files are the source of truth. `learning-console.html` is a generated static view created by default after a plan is imported.
 
 ## Hard Rules
 
@@ -97,7 +98,7 @@ When the user provides a learning plan:
    - reminder configuration preview
 4. Ask for confirmation before writing files or creating automations.
 
-If the user asks for a learning dashboard, preview that `learning-companion/learning-console.html` will be created from `references/learning-console-template.html`.
+When the user confirms plan import, include `learning-companion/learning-console.html` in the created files by default. Preview that the file will be created from `references/learning-console-template.html`.
 
 ## Static Dashboard Protocol
 
@@ -149,7 +150,9 @@ In dashboard-refresh mode:
 5. Preserve the HTML layout and render logic.
 6. Report the refreshed path and source files used.
 
-Use console-create mode when the user asks to create the learning panel. Create `learning-companion/learning-console.html` from `references/learning-console-template.html` only after the user asks or confirms.
+Use console-create mode when a plan import is confirmed or when the user explicitly asks to create the learning panel. Create `learning-companion/learning-console.html` from `references/learning-console-template.html` as part of the confirmed import flow.
+
+If `learning-console.html` already exists during import, do not overwrite the user's customized layout without confirmation. Prefer refreshing only the `window.learningData` section.
 
 The static dashboard layout is intentionally limited to:
 

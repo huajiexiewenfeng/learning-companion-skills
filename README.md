@@ -57,7 +57,7 @@ It supports:
 - lightweight review with one-sentence understanding and small verification questions
 - plan progress and effective progress tracking
 - daily rescue tasks and weekly review
-- optional static HTML learning dashboard generated from Markdown files
+- static HTML learning dashboard generated from Markdown files after plan import
 
 It does not design a full curriculum from scratch by default. The user provides the learning plan or imports one designed by `course-designer`; the skill normalizes, tracks, reminds, reviews, and adjusts pacing.
 
@@ -69,12 +69,13 @@ It does not design a full curriculum from scratch by default. The user provides 
 3. Confirm the course.
 4. Import it with learning-companion.
 5. Use learning-companion for daily study, tutor mode, close-out review, scoring, and progress tracking.
-6. Optionally create or refresh learning-console.html to view progress in a static dashboard.
+6. After import, learning-companion creates learning-console.html by default.
+7. Refresh learning-console.html when learning records change and the learner wants to update the view.
 ```
 
 ## Static Learning Dashboard
 
-`learning-companion` can create a standalone `learning-console.html` file in the learner's workspace. It is a static view, not a separate app.
+`learning-companion` creates a standalone `learning-console.html` file in the learner's workspace after a plan is imported. It is a static view, not a separate app.
 
 The dashboard focuses on five sections:
 
@@ -86,6 +87,7 @@ The dashboard focuses on five sections:
 
 Typical requests:
 
+- "import this plan into learning-companion"
 - "create learning dashboard"
 - "refresh learning dashboard"
 - "show my learning progress"
@@ -118,7 +120,7 @@ Recommended structure in the target workspace:
 ```text
 learning-companion/
   index.md
-  learning-console.html              # optional static view
+  learning-console.html              # static view created by default after import
   plans/
     <plan-id>/
       dashboard.md
