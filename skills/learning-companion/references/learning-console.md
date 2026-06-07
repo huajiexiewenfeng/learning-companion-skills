@@ -98,7 +98,7 @@ Do not update plan progress, effective progress, map status, or log entries.
 
 ### dashboard-refresh
 
-Use when the user explicitly asks to refresh or update the learning console.
+Use when the user explicitly asks to refresh or update the learning console, or when an existing console should stay in sync after daily state changes.
 
 Trigger examples:
 
@@ -122,6 +122,13 @@ Behavior:
 
 Do not create learning progress that is not backed by Markdown evidence.
 
+Automatic refresh behavior:
+
+- After the user replies `1`, update the Markdown learning state first, then refresh `learning-console.html` if it exists.
+- After `下课` close-out updates `dashboard.md`, `map.md`, `log.md`, or `index.md`, refresh `learning-console.html` if it exists.
+- Automatic refresh must update only the `window.learningData` section.
+- If `learning-console.html` does not exist, do not create it during ordinary `1` or `下课`.
+
 ### console-create
 
 Use when a learning plan import is confirmed, or when the user asks to create a learning console.
@@ -143,7 +150,7 @@ Behavior:
 4. Keep starter values conservative when evidence is incomplete.
 5. If `learning-console.html` already exists, preserve its layout and refresh only `window.learningData` unless the user confirms replacement.
 
-Do not silently create the console during ordinary study or close-out review. The default creation rule applies to confirmed plan import.
+Do not silently create the console during ordinary study or close-out review. The default creation rule applies to confirmed plan import. If the console already exists, ordinary study and close-out may refresh its data block.
 
 ## Layout Contract
 
@@ -219,10 +226,11 @@ Update the console only when one of these happens:
 
 - user explicitly asks to create or refresh the learning console
 - a plan is imported or created after user confirmation
-- a close-out review changes dashboard/log state and the user asks to refresh the console
-- weekly review changes dashboard/log state and the user asks to refresh the console
+- user replies `1` and today's learning state is updated
+- a close-out review changes dashboard/log/map/index state
+- weekly review changes dashboard/log/map/index state
 
-Do not update the console during:
+Do not create the console during:
 
 - ordinary lightweight discussion
 - unanswered study sessions

@@ -129,7 +129,7 @@ In dashboard-query mode:
 
 Do not update progress, map status, mastery, or logs in dashboard-query mode.
 
-Use dashboard-refresh mode when the user explicitly asks to refresh the learning panel or dashboard. Trigger examples:
+Use dashboard-refresh mode when the user explicitly asks to refresh the learning panel or dashboard, or when a daily state change should keep an existing console in sync. Trigger examples:
 
 ```text
 刷新学习面板
@@ -149,6 +149,13 @@ In dashboard-refresh mode:
 4. Refresh only the `window.learningData` section in `learning-console.html` when possible.
 5. Preserve the HTML layout and render logic.
 6. Report the refreshed path and source files used.
+
+Automatic dashboard refresh:
+
+- After the user replies `1` and the skill updates today's state to studying, refresh `learning-console.html` if it exists.
+- After `下课` close-out updates `dashboard.md`, `map.md`, `log.md`, or `index.md`, refresh `learning-console.html` if it exists.
+- Automatic refresh must update only the `window.learningData` section. Do not rewrite the HTML layout, CSS, or render logic.
+- If `learning-console.html` does not exist, do not create it during ordinary `1` or `下课`; creation remains part of confirmed plan import or explicit console-create.
 
 Use console-create mode when a plan import is confirmed or when the user explicitly asks to create the learning panel. Create `learning-companion/learning-console.html` from `references/learning-console-template.html` as part of the confirmed import flow.
 
@@ -177,7 +184,7 @@ Use low-friction replies:
 下课 = 学完了，开始收口记录
 ```
 
-When the user replies `1`, mark the plan as studying for today and schedule a close-out reminder 2 hours later. Do not ask for more input.
+When the user replies `1`, mark the plan as studying for today and schedule a close-out reminder 2 hours later. If `learning-companion/learning-console.html` exists, refresh only its `window.learningData` section. Do not ask for more input.
 
 When the user replies `下课`, run a short review:
 
@@ -186,6 +193,7 @@ When the user replies `下课`, run a short review:
 3. Score mastery.
 4. Update dashboard and log.
 5. Decide tomorrow's strategy.
+6. If `learning-companion/learning-console.html` exists, refresh only its `window.learningData` section.
 
 ## Teaching Protocol
 
