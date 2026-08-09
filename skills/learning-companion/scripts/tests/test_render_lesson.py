@@ -93,9 +93,13 @@ class RenderLessonTest(unittest.TestCase):
                     f'<desc id="{section["id"]}-desc">{section["summary"]}</desc>',
                     artifact.html,
                 )
+                desktop = artifact.html.split("<svg", 1)[1].split("</svg>", 1)[0]
                 mobile = artifact.html.split('<ol class="mobile-semantic-flow">', 1)[1]
                 for node in section["nodes"]:
                     self.assertIn(node["label"], mobile)
+                    if "detail" in node:
+                        self.assertIn(node["detail"], desktop)
+                        self.assertIn(node["detail"], mobile)
                 for edge in section["edges"]:
                     self.assertIn(edge["label"], mobile)
                 self.assert_valid(artifact)
@@ -184,7 +188,11 @@ class RenderLessonTest(unittest.TestCase):
                             "id": f"node-{index}",
                             "label": f"Node {index}",
                             "kind": ("neutral", "gate", "risk")[index % 3],
-                            "group": f"Group {index % 2}",
+                            **(
+                                {"group": f"Group {index % 2}"}
+                                if section_type == "boundary-map"
+                                else {}
+                            ),
                         }
                         for index in range(node_count)
                     ]
@@ -268,7 +276,10 @@ class RenderLessonTest(unittest.TestCase):
         for group in groups:
             self.assertIn('class="diagram-boundary-label"', html)
             self.assertIn(f'>{group}</text>', html)
-            self.assertIn(f'<span class="mobile-flow-group">{group}</span>', mobile)
+            self.assertEqual(
+                sum(node["group"] == group for node in boundary["nodes"]),
+                mobile.count(f'<span class="mobile-flow-group">{group}</span>'),
+            )
 
         changed_kinds = copy.deepcopy(boundary)
         for node in changed_kinds["nodes"]:
@@ -281,6 +292,14 @@ class RenderLessonTest(unittest.TestCase):
         missing_group["nodes"][0].pop("group")
         with self.assertRaisesRegex(ValueError, "declared groups"):
             render_relation(missing_group)
+
+        non_boundary_group = next(
+            section for section in BASE_MODEL["sections"] if section["type"] == "flow"
+        )
+        non_boundary_group = copy.deepcopy(non_boundary_group)
+        non_boundary_group["nodes"][0]["group"] = "not-a-boundary"
+        with self.assertRaisesRegex(ValueError, "only boundary-map"):
+            render_relation(non_boundary_group)
 
     def test_relation_node_and_edge_labels_are_escaped(self):
         self.assertIsNotNone(render_relation, "the relationship renderer must exist")

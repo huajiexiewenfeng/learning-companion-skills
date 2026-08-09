@@ -52,6 +52,11 @@ class LessonModelTest(unittest.TestCase):
         self.assertEqual({"type": "string"}, node["properties"]["group"])
         self.assertNotIn("detail", node["required"])
         self.assertNotIn("group", node["required"])
+        boundary_rule = schema["$defs"]["section"]["allOf"][0]
+        self.assertEqual(
+            ["group"],
+            boundary_rule["else"]["properties"]["nodes"]["items"]["not"]["required"],
+        )
 
     def test_node_detail_and_group_validator_contract(self):
         valid_without_optional_node_facts = self.valid_model()
@@ -69,6 +74,10 @@ class LessonModelTest(unittest.TestCase):
                 model = self.valid_model()
                 model["sections"][1]["nodes"][0][field] = value
                 self.assertIn(expected_code, self.issue_codes(model))
+
+        non_boundary_group = self.valid_model()
+        non_boundary_group["sections"][1]["nodes"][0]["group"] = "not-a-boundary"
+        self.assertIn("node-group-not-allowed", self.issue_codes(non_boundary_group))
 
     def test_boundary_groups_are_required_and_distinct(self):
         boundary_index = next(

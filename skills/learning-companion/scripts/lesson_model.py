@@ -232,6 +232,14 @@ def _validate_relations(
                         "node-group-invalid", f"{node_path}.group", "expected a string"
                     )
                 )
+            if not boundary_map and "group" in node:
+                issues.append(
+                    ValidationIssue(
+                        "node-group-not-allowed",
+                        f"{node_path}.group",
+                        "group is only allowed for boundary-map nodes",
+                    )
+                )
             group = node.get("group")
             if boundary_map:
                 if not isinstance(group, str) or not group.strip():

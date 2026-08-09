@@ -320,6 +320,8 @@ def render_relation(section: Mapping[str, Any]) -> str:
         raise ValueError("relational section requires an ID, title, and summary")
 
     nodes = _relation_nodes(section)
+    if section_type != "boundary-map" and any("group" in node for node in nodes):
+        raise ValueError("node group is only boundary-map metadata")
     node_identifiers = {node["id"]: f"node-{index}" for index, node in enumerate(nodes)}
     edges = _relation_edges(section, set(node_identifiers))
     if section_type == "boundary-map":

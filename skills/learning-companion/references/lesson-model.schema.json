@@ -83,6 +83,14 @@
                 }
               }
             }
+          },
+          "else": {
+            "properties": {
+              "nodes": {
+                "type": "array",
+                "items": {"not": {"required": ["group"]}}
+              }
+            }
           }
         }
       ]
