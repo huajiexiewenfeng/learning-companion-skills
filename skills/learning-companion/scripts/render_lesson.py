@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from html import escape
+import json
 from pathlib import Path
 from string import Template
 from typing import Any, Callable, Mapping
@@ -412,4 +413,101 @@ def render_section(
         relative_path=f"cards/{slugify(section['id'])}.html",
         html=html,
         required_terms=required_terms_for_section(model, section),
+    )
+
+
+def render_deck(
+    model: Mapping[str, Any],
+    deck: Mapping[str, Any],
+    sections: tuple[Mapping[str, Any], ...],
+    theme_css: str,
+    relative_path: str,
+) -> RenderedArtifact:
+    """Render one offline deck index using only fragment navigation.
+
+    Deck slides remain independently rendered artifacts.  The index intentionally
+    contains no file links because the offline artifact validator permits only
+    fragment navigation within a self-contained HTML file.
+    """
+    slide_items = "".join(
+        f'<li><a href="#slide-{slugify(section["id"])}">{_text(section["title"])}</a>'
+        f'<p>{_text(section["summary"])}</p></li>'
+        for section in sections
+    )
+    sections_markup = "".join(
+        f'<section id="slide-{slugify(section["id"])}" class="panel">'
+        f'<h2>{_text(section["title"])}</h2><p>{_text(section["summary"])}</p></section>'
+        for section in sections
+    )
+    title = str(deck["title"])
+    body = (
+        '<article class="lesson-card"><section class="panel">'
+        f'<p class="eyebrow">Lesson deck · Day {model["session"]["day"]:02d}</p>'
+        f'<h1>{_text(title)}</h1><ol>{slide_items}</ol></section>{sections_markup}</article>'
+    )
+    return RenderedArtifact(
+        id=f'deck-{deck["id"]}',
+        title=title,
+        profile="document",
+        relative_path=relative_path,
+        html=render_template(
+            "lesson-document.html",
+            title=_text(title),
+            theme_css=theme_css,
+            body=body,
+            footer=_text(f"{model['session']['topic']} · deck"),
+        ),
+        required_terms=(),
+    )
+
+
+def render_hub(
+    model: Mapping[str, Any],
+    decks: tuple[Mapping[str, Any], ...],
+    theme_css: str,
+    refresh: bool,
+) -> RenderedArtifact:
+    """Render the session hub with only allow-listed offline hub scripts."""
+    deck_items = "".join(
+        f'<li><a href="#deck-{slugify(str(deck["id"]))}">{_text(deck["title"])}</a></li>'
+        for deck in decks
+    )
+    deck_markup = "".join(
+        f'<section id="deck-{slugify(str(deck["id"]))}" class="panel">'
+        f'<h2>{_text(deck["title"])}</h2><p>{len(deck["sectionIds"])} slides</p></section>'
+        for deck in decks
+    )
+    payload = json.dumps(
+        {
+            "sessionId": model["session"]["id"],
+            "topic": model["session"]["topic"],
+            "deckIds": [deck["id"] for deck in decks],
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).replace("</", "<\\/")
+    refresh_script = (
+        '<script id="lesson-refresh">window.dispatchEvent(new Event("lesson-refresh"));</script>'
+        if refresh
+        else ""
+    )
+    body = (
+        '<main class="page"><article class="lesson-card"><section class="panel">'
+        '<p class="eyebrow">Learning session</p>'
+        f'<h1>{_text(model["session"]["topic"])}</h1>'
+        f'<p>{_text(model["question"])}</p><ol>{deck_items}</ol></section>{deck_markup}</article></main>'
+    )
+    html = (
+        '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f'<title>{_text(model["session"]["topic"])}</title><style>{theme_css}</style></head><body>{body}'
+        f'<script id="lesson-data" type="application/json">{payload}</script>{refresh_script}</body></html>'
+    )
+    return RenderedArtifact(
+        id="hub",
+        title=str(model["session"]["topic"]),
+        profile="hub",
+        relative_path="index.html",
+        html=html,
+        required_terms=(),
     )
