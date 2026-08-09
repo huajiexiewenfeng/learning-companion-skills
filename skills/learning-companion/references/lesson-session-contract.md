@@ -63,7 +63,10 @@ pass its declared HTML profile; a tampered immutable artifact fails closed.
 Promotion preflights every version destination before final writes. The ledger,
 lifecycle files, and mutable indexes are snapshotted before commit. Any later
 write, collision, ledger, or status failure restores those snapshots and
-removes every newly created immutable artifact.
+removes every newly created immutable artifact. Immutable publication claims
+its final path exclusively, flushes and fsyncs its bytes, and records the
+claimed file identity; a post-claim failure removes only that same partial
+file, never a foreign collision file that won the path.
 
 `close` performs the final render with hub refresh disabled, sets both lesson
 metadata files to `closed`, and writes `.artifacts-frozen`. Frozen packages

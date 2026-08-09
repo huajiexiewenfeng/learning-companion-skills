@@ -964,8 +964,23 @@ def _write_new_bytes(path: Path, raw: bytes, context: SessionContext) -> None:
     target = _safe_path(context, path)
     target.parent.mkdir(parents=True, exist_ok=True)
     _safe_path(context, target.parent)
-    with target.open("xb") as output:
-        output.write(raw)
+    owned_identity: tuple[int, int] | None = None
+    try:
+        with target.open("xb") as output:
+            stat = target.stat()
+            owned_identity = (stat.st_dev, stat.st_ino)
+            output.write(raw)
+            output.flush()
+            os.fsync(output.fileno())
+    except Exception:
+        if owned_identity is not None:
+            try:
+                current = target.stat()
+                if (current.st_dev, current.st_ino) == owned_identity:
+                    target.unlink()
+            except OSError:
+                pass
+        raise
 
 
 def _atomic_write_bytes(context: SessionContext, path: Path | str, raw: bytes) -> None:

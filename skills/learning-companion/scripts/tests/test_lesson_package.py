@@ -318,6 +318,42 @@ class LessonPackageTest(unittest.TestCase):
         self.assertEqual("failed", report.overall)
         self.assertEqual(b"foreign actor bytes", foreign.read_bytes())
 
+    def test_post_claim_immutable_write_failure_removes_its_partial_file_and_rolls_back(self):
+        session = self.valid_session()
+        self.assertEqual("passed", prepare_session(session).overall)
+        model_path = session / "lesson-model.json"
+        model = json.loads(model_path.read_text(encoding="utf-8"))
+        model["sections"][0]["summary"] = "写入后失败回滚"
+        model_path.write_text(json.dumps(model, ensure_ascii=False), encoding="utf-8")
+        before = self.snapshot(session)
+        partial = session / "cards" / "core-concept-v2.html"
+        original_open = Path.open
+
+        class FailingOutput:
+            def __init__(self, output):
+                self.output = output
+
+            def __enter__(self):
+                return self
+
+            def write(self, _raw):
+                raise OSError("simulated post-claim write failure")
+
+            def __exit__(self, *_exc):
+                self.output.close()
+
+        def post_claim_open(path, mode="r", *args, **kwargs):
+            if path == partial and mode == "xb":
+                return FailingOutput(original_open(path, mode, *args, **kwargs))
+            return original_open(path, mode, *args, **kwargs)
+
+        with patch.object(Path, "open", new=post_claim_open):
+            report = sync_session(session)
+
+        self.assertEqual("failed", report.overall)
+        self.assertFalse(partial.exists())
+        self.assertEqual(before, self.snapshot(session))
+
     def test_current_deck_manifest_rejects_stale_history_until_new_definition_syncs(self):
         session = self.valid_session(decks=2)
         self.assertEqual("passed", prepare_session(session).overall)
