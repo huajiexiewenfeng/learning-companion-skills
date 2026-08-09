@@ -40,6 +40,18 @@ def _source_list(section: Mapping[str, Any]) -> str:
     return f'<section class="panel"><h2>Sources</h2><ol class="source-list">{items}</ol></section>'
 
 
+def required_terms_for_section(
+    model: Mapping[str, Any], section: Mapping[str, Any]
+) -> tuple[str, ...]:
+    """Return declared terms evidenced by the section model, before rendering."""
+    source_values: list[object] = [section["title"], section["summary"]]
+    source_values.extend(section.get("sourceRefs", ()))
+    source_values.extend(node["label"] for node in section.get("nodes", ()))
+    source_values.extend(edge.get("label", "") for edge in section.get("edges", ()))
+    source_text = "\n".join(str(value) for value in source_values)
+    return tuple(term for term in model["requiredTerms"] if term in source_text)
+
+
 def _section_shell(section: Mapping[str, Any], eyebrow: str, details: str = "") -> str:
     return (
         '<article class="lesson-card">'
@@ -82,6 +94,7 @@ def render_sources(section: Mapping[str, Any]) -> str:
 def _diagram(section: Mapping[str, Any]) -> str:
     nodes = tuple(section.get("nodes", ()))
     node_ids = {node["id"]: f"node-{index}" for index, node in enumerate(nodes)}
+    node_labels = {node["id"]: node["label"] for node in nodes}
     positions = {
         node["id"]: (20 + (index % 3) * 210, 45 + (index // 3) * 95)
         for index, node in enumerate(nodes)
@@ -97,6 +110,15 @@ def _diagram(section: Mapping[str, Any]) -> str:
         )
         for index, node in enumerate(nodes)
     )
+    declared_edges = tuple(
+        edge
+        for edge in section.get("edges", ())
+        if edge["from"] in node_ids
+        and edge["to"] in node_ids
+        and edge["from"] != edge["to"]
+    )
+    if not declared_edges:
+        raise ValueError("relational section requires a declared edge between distinct nodes")
     edge_markup = "".join(
         '<path class="diagram-edge" data-edge-from="{source}" data-edge-to="{target}" d="M {start_x} {start_y} L {end_x} {end_y}"></path>'
         '<text class="diagram-edge-label" x="{label_x}" y="{label_y}">{label}</text>'.format(
@@ -110,28 +132,16 @@ def _diagram(section: Mapping[str, Any]) -> str:
             label_y=(positions[edge["from"]][1] + positions[edge["to"]][1] + 54) // 2,
             label=_text(edge.get("label", "")),
         )
-        for edge in section.get("edges", ())
+        for edge in declared_edges
     )
-    has_relation = len(node_ids) >= 2 and any(
-        edge["from"] in node_ids
-        and edge["to"] in node_ids
-        and edge["from"] != edge["to"]
-        for edge in section.get("edges", ())
+    description = "; ".join(
+        "{} {} {}".format(
+            node_labels[edge["from"]],
+            edge.get("label") or "connects to",
+            node_labels[edge["to"]],
+        )
+        for edge in declared_edges
     )
-    if not has_relation:
-        edge_markup += (
-            '<path class="diagram-edge" data-edge-from="diagram-context" '
-            'data-edge-to="diagram-outcome" d="M 0 0 L 1 1"></path>'
-            '<text class="diagram-edge-label" x="10" y="15">relationship frame</text>'
-        )
-        node_markup += (
-            '<g class="diagram-node" data-node-id="diagram-context" transform="translate(20 235)">'
-            '<rect width="180" height="54" rx="10"></rect>'
-            '<text x="90" y="32" text-anchor="middle">Context</text></g>'
-            '<g class="diagram-node" data-node-id="diagram-outcome" transform="translate(230 235)">'
-            '<rect width="180" height="54" rx="10"></rect>'
-            '<text x="90" y="32" text-anchor="middle">Outcome</text></g>'
-        )
     return (
         '<article class="lesson-card"><section class="panel technical-visual" aria-labelledby="lesson-title">'
         '<p class="eyebrow">Systems relationship</p>'
@@ -139,7 +149,7 @@ def _diagram(section: Mapping[str, Any]) -> str:
         f'<p class="summary">{_text(section["summary"])}</p>'
         '<svg role="img" viewBox="0 0 660 360" aria-labelledby="diagram-title diagram-description">'
         f'<title id="diagram-title">{_text(section["title"])}</title>'
-        f'<desc id="diagram-description">{_text(section["summary"])}</desc>'
+        f'<desc id="diagram-description">{_text(description)}</desc>'
         f"{edge_markup}{node_markup}</svg></section>{_source_list(section)}</article>"
     )
 
@@ -188,5 +198,5 @@ def render_section(
         profile=profile,
         relative_path=f"cards/{slugify(section['id'])}.html",
         html=html,
-        required_terms=tuple(term for term in model["requiredTerms"] if term in html),
+        required_terms=required_terms_for_section(model, section),
     )

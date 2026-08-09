@@ -16,6 +16,11 @@ try:
 except ModuleNotFoundError:
     render_section = None
 
+try:
+    from render_lesson import required_terms_for_section
+except ImportError:
+    required_terms_for_section = None
+
 
 FIXTURES = Path(__file__).parent / "fixtures"
 ASSETS = SCRIPT_DIR.parent / "assets"
@@ -87,7 +92,31 @@ class RenderLessonTest(unittest.TestCase):
         self.assertIn("fe\u200btch()", artifact.html)
         self.assert_valid(artifact)
 
-    def test_sparse_valid_relation_still_satisfies_the_visual_profile(self):
+    def test_source_required_term_survives_an_accidental_rendering_omission(self):
+        model = copy.deepcopy(BASE_MODEL)
+        model["requiredTerms"] = ["source obligation"]
+        section = {
+            "id": "source-term",
+            "type": "concept",
+            "title": "Term evidence",
+            "summary": "This source obligation must remain visible.",
+            "sourceRefs": ["guide.md#Section"],
+        }
+        self.assertIsNotNone(required_terms_for_section)
+        self.assertEqual(
+            ("source obligation",), required_terms_for_section(model, section)
+        )
+        artifact = self.render(model, section)
+        self.assertEqual(("source obligation",), artifact.required_terms)
+        omitted_html = artifact.html.replace("source obligation", "rendering omission")
+        self.assertNotIn("source obligation", omitted_html)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "omitted.html"
+            path.write_text(omitted_html, encoding="utf-8", newline="\n")
+            report = validate_html(path, artifact.required_terms, artifact.profile)
+        self.assertIn("required-term-missing:source obligation", report["errors"])
+
+    def test_sparse_relation_fails_closed_without_a_declared_edge(self):
         section = {
             "id": "sparse-map",
             "type": "layer-map",
@@ -97,9 +126,8 @@ class RenderLessonTest(unittest.TestCase):
             "edges": [],
             "sourceRefs": ["guide.md#Section"],
         }
-        artifact = self.render(BASE_MODEL, section)
-        self.assertEqual("technical-visual", artifact.profile)
-        self.assert_valid(artifact)
+        with self.assertRaisesRegex(ValueError, "relational section requires a declared edge"):
+            self.render(BASE_MODEL, section)
 
     def test_all_document_component_types_pass_the_document_profile(self):
         for section_type in ("hero", "concept", "case-study", "misconception", "check-question", "sources"):
