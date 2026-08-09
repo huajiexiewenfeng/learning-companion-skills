@@ -1,4 +1,5 @@
 import copy
+import re
 import tempfile
 from pathlib import Path
 import sys
@@ -25,7 +26,6 @@ try:
     from render_lesson import render_relation
 except ImportError:
     render_relation = None
-
 
 FIXTURES = Path(__file__).parent / "fixtures"
 ASSETS = SCRIPT_DIR.parent / "assets"
@@ -151,6 +151,146 @@ class RenderLessonTest(unittest.TestCase):
         }
         with self.assertRaisesRegex(ValueError, "declared edge"):
             render_relation(invalid)
+
+    def test_relation_rejects_disconnected_and_duplicate_graphs(self):
+        self.assertIsNotNone(render_relation, "the relationship renderer must exist")
+        section = {
+            "id": "disconnected-flow",
+            "type": "flow",
+            "title": "Disconnected flow",
+            "summary": "Every declared node must participate in one graph.",
+            "nodes": [
+                {"id": "first", "label": "First", "kind": "neutral"},
+                {"id": "second", "label": "Second", "kind": "active"},
+                {"id": "orphan", "label": "Orphan", "kind": "risk"},
+            ],
+            "edges": [{"from": "first", "to": "second", "label": "Connect"}],
+        }
+        with self.assertRaisesRegex(ValueError, "connected graph"):
+            render_relation(section)
+
+        duplicate = copy.deepcopy(section)
+        duplicate["nodes"] = duplicate["nodes"][:2]
+        duplicate["edges"].append({"from": "first", "to": "second", "label": "Repeat"})
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            render_relation(duplicate)
+
+    def test_relation_geometry_never_overlaps_for_supported_node_counts(self):
+        for section_type in ("flow", "timeline", "layer-map", "boundary-map"):
+            for node_count in range(2, 11):
+                with self.subTest(section_type=section_type, node_count=node_count):
+                    nodes = [
+                        {
+                            "id": f"node-{index}",
+                            "label": f"Node {index}",
+                            "kind": ("neutral", "gate", "risk")[index % 3],
+                        }
+                        for index in range(node_count)
+                    ]
+                    section = {
+                        "id": f"{section_type}-{node_count}",
+                        "type": section_type,
+                        "title": f"{section_type} {node_count}",
+                        "summary": "Deterministic node spacing.",
+                        "nodes": nodes,
+                        "edges": [
+                            {
+                                "from": nodes[index]["id"],
+                                "to": nodes[index + 1]["id"],
+                                "label": f"Step {index}",
+                            }
+                            for index in range(node_count - 1)
+                        ],
+                    }
+                    html = render_relation(section)
+                    positions = [
+                        (int(x), int(y))
+                        for x, y in re.findall(
+                            r'<g class="diagram-node [^"]+" data-node-id="node-\d+" '
+                            r'transform="translate\((\d+) (\d+)\)">',
+                            html,
+                        )
+                    ]
+                    self.assertEqual(node_count, len(positions))
+                    for index, (left_x, top_y) in enumerate(positions):
+                        for right_x, bottom_y in positions[index + 1 :]:
+                            separated = (
+                                left_x + 200 <= right_x
+                                or right_x + 200 <= left_x
+                                or top_y + 96 <= bottom_y
+                                or bottom_y + 96 <= top_y
+                            )
+                            self.assertTrue(separated, (section_type, node_count, positions))
+                    viewbox = re.search(r'viewBox="0 0 (\d+) (\d+)"', html)
+                    self.assertIsNotNone(viewbox)
+                    self.assertGreaterEqual(int(viewbox.group(1)), max(x + 200 for x, _ in positions))
+                    self.assertGreaterEqual(int(viewbox.group(2)), max(y + 96 for _, y in positions))
+
+    def test_relation_preserves_details_and_declared_edge_order_in_both_alternatives(self):
+        self.assertIsNotNone(render_relation, "the relationship renderer must exist")
+        section = {
+            "id": "detail-flow",
+            "type": "flow",
+            "title": "Detailed flow",
+            "summary": "Desktop and mobile retain every declared fact.",
+            "nodes": [
+                {"id": "one", "label": "One", "detail": "<detail & one>", "kind": "neutral"},
+                {"id": "two", "label": "Two", "detail": "Second detail", "kind": "active"},
+                {"id": "three", "label": "Three", "detail": "Third detail", "kind": "gate"},
+            ],
+            "edges": [
+                {"from": "one", "to": "two", "label": "First edge"},
+                {"from": "two", "to": "three", "label": "Second edge"},
+            ],
+        }
+        html = render_relation(section)
+        mobile = html.split('<ol class="mobile-semantic-flow">', 1)[1]
+        for node in section["nodes"]:
+            expected_detail = node["detail"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            self.assertEqual(2, html.count(expected_detail))
+            self.assertIn(expected_detail, mobile)
+            self.assertIn('class="diagram-node-kind"', html)
+            self.assertIn(f'>{node["kind"]}</text>', html)
+            self.assertIn(
+                f'<span class="mobile-flow-kind">{node["kind"]}</span>', mobile
+            )
+        self.assertLess(mobile.index("First edge"), mobile.index("Second edge"))
+
+    def test_boundary_map_uses_declared_kind_groups_and_rejects_one_group(self):
+        self.assertIsNotNone(render_relation, "the relationship renderer must exist")
+        boundary = next(
+            section for section in BASE_MODEL["sections"] if section["type"] == "boundary-map"
+        )
+        html = render_relation(boundary)
+        for kind in ("neutral", "gate", "risk"):
+            self.assertIn('class="diagram-boundary-label"', html)
+            self.assertIn(f'>{kind}</text>', html)
+
+        one_group = copy.deepcopy(boundary)
+        for node in one_group["nodes"]:
+            node["kind"] = "neutral"
+        with self.assertRaisesRegex(ValueError, "meaningful declared groups"):
+            render_relation(one_group)
+
+    def test_relation_output_is_byte_identical_and_uses_slugged_accessibility_ids(self):
+        self.assertIsNotNone(render_relation, "the relationship renderer must exist")
+        section = {
+            "id": "Day 01: Diagram!",
+            "type": "timeline",
+            "title": "<Safe title>",
+            "summary": "Summary & evidence",
+            "nodes": [
+                {"id": "start", "label": "Start", "detail": "Evidence", "kind": "success"},
+                {"id": "finish", "label": "Finish", "detail": "Result", "kind": "gate"},
+            ],
+            "edges": [{"from": "start", "to": "finish", "label": "Advance"}],
+        }
+        first = render_relation(section)
+        second = render_relation(section)
+        self.assertEqual(first.encode("utf-8"), second.encode("utf-8"))
+        self.assertIn('aria-labelledby="day-01-diagram-title day-01-diagram-desc"', first)
+        self.assertIn('&lt;Safe title&gt;', first)
+        self.assertIn('Summary &amp; evidence', first)
 
     def test_network_like_model_text_is_visible_without_failing_validation(self):
         model = copy.deepcopy(BASE_MODEL)
