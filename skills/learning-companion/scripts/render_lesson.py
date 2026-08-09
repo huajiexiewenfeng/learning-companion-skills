@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from html import escape
 from pathlib import Path
-import re
 from string import Template
 from typing import Any, Callable, Mapping
 
@@ -27,11 +26,7 @@ class RenderedArtifact:
 
 def _text(value: object) -> str:
     """Return a model value safely for a text node."""
-    text = escape(str(value), quote=False)
-    text = re.sub(r"(https?):(//)", "\\1:\u200b\\2", text, flags=re.IGNORECASE)
-    text = re.sub(r"\bfe(tch)\s*(\()", "fe\u200b\\1\\2", text, flags=re.IGNORECASE)
-    text = re.sub(r"\b(XMLHttp)(Request)\b", "\\1\u200b\\2", text, flags=re.IGNORECASE)
-    return re.sub(r"\b(Web)(Socket)\b", "\\1\u200b\\2", text, flags=re.IGNORECASE)
+    return escape(str(value), quote=False)
 
 
 def _source_list(section: Mapping[str, Any]) -> str:

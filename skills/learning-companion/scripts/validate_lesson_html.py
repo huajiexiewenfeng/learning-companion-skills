@@ -327,7 +327,12 @@ def enforce_shared_contract(
             append_once(errors, violation)
     if re.search(r"@import\b", CSS_STRING.sub("", css), re.IGNORECASE):
         append_once(errors, "network-reference-forbidden")
-    if any(pattern.search("\n".join(parser.content_chunks)) for pattern in NETWORK_PATTERNS):
+    executable_script_text = "\n".join(
+        "".join(record["body"])
+        for record in parser.script_records
+        if (record["attrs"].get("type") or "").strip().lower() != "application/json"
+    )
+    if any(pattern.search(executable_script_text) for pattern in NETWORK_PATTERNS):
         append_once(errors, "network-reference-forbidden")
     if not css_has_media(css, "max-width"):
         append_once(errors, "responsive-rule-missing")

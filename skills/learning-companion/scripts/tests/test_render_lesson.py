@@ -80,6 +80,13 @@ class RenderLessonTest(unittest.TestCase):
         self.assert_valid(artifact)
 
     def test_network_like_model_text_is_visible_without_failing_validation(self):
+        model = copy.deepcopy(BASE_MODEL)
+        model["requiredTerms"] = [
+            "https://example.test/reference",
+            "fetch",
+            "WebSocket",
+            "XMLHttpRequest",
+        ]
         section = {
             "id": "safe-network-text",
             "type": "concept",
@@ -87,9 +94,12 @@ class RenderLessonTest(unittest.TestCase):
             "summary": "WebSocket and XMLHttpRequest are names, not executable code.",
             "sourceRefs": ["https://example.test/reference"],
         }
-        artifact = self.render(BASE_MODEL, section)
-        self.assertIn("https:\u200b//example.test/reference", artifact.html)
-        self.assertIn("fe\u200btch()", artifact.html)
+        artifact = self.render(model, section)
+        self.assertIn("https://example.test/reference", artifact.html)
+        self.assertIn("fetch()", artifact.html)
+        self.assertIn("WebSocket", artifact.html)
+        self.assertIn("XMLHttpRequest", artifact.html)
+        self.assertEqual(tuple(model["requiredTerms"]), artifact.required_terms)
         self.assert_valid(artifact)
 
     def test_source_required_term_survives_an_accidental_rendering_omission(self):

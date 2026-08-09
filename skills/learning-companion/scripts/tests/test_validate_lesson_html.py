@@ -121,6 +121,27 @@ class ValidateLessonHtmlTest(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertIn(expected, validate_html(self.write(markup), (), "document")["errors"])
 
+    def test_allows_visible_network_words_but_rejects_resource_contexts(self):
+        visible = DOCUMENT_HTML.replace(
+            "模型能力",
+            "https://example.test fetch( WebSocket XMLHttpRequest",
+        )
+        self.assertEqual(
+            "passed",
+            validate_html(
+                self.write(visible),
+                ("https://example.test", "fetch", "WebSocket", "XMLHttpRequest"),
+                "document",
+            )["overall"],
+        )
+        resource = visible.replace(
+            "</body>", '<a href="https://example.test">source</a></body>'
+        )
+        self.assertIn(
+            "external-resource-forbidden",
+            validate_html(self.write(resource), (), "document")["errors"],
+        )
+
     def test_rejects_css_imports_and_urls_after_css_escape_normalization(self):
         cases = (
             ("local import", "@import url(local.css);", "network-reference-forbidden"),
