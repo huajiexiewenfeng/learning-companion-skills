@@ -17,7 +17,11 @@ from urllib.parse import unquote
 DEFAULT_MAX_BYTES = 2_000_000
 PROFILES = frozenset({"document", "technical-visual", "hub"})
 ALLOWED_HUB_SCRIPTS = frozenset({"lesson-data", "lesson-refresh"})
+# The active hub states are deliberately finite: each owns the same approved
+# controller, while a closed hub remains fully navigable without one.
 HUB_ACTIVE_STATUSES = frozenset({"studying", "awaiting-voice", "unsynced"})
+HUB_CLOSED_STATUSES = frozenset({"closed"})
+HUB_ALLOWED_STATUSES = HUB_ACTIVE_STATUSES | HUB_CLOSED_STATUSES
 HUB_REFRESH_BODY = """(() => {
   const key = `learning-companion-scroll:${location.pathname}`;
   addEventListener("beforeunload", () => sessionStorage.setItem(key, String(scrollY)));
@@ -27,7 +31,7 @@ HUB_REFRESH_BODY = """(() => {
   });
   setTimeout(() => location.reload(), 5000);
 })();"""
-HUB_REFRESH_BODY_SHA256 = hashlib.sha256(HUB_REFRESH_BODY.encode("utf-8")).hexdigest()
+HUB_REFRESH_BODY_SHA256 = "c74305cd5efdf45e05e60680f948c0f58ccab9d99ac1a1d79e62e8fda57ee099"
 RESOURCE_ATTRIBUTES = frozenset({"src", "srcset", "href", "poster", "action", "data"})
 VOID_TAGS = frozenset({"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"})
 EXECUTABLE_SCHEMES = frozenset({"javascript", "vbscript"})
@@ -151,7 +155,8 @@ class ContractParser(HTMLParser):
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         normalized_tag = tag.lower()
         self._validate_start(normalized_tag, attrs)
-        attributes = {name.lower(): value for name, value in attrs}
+        normalized_attrs = tuple((name.lower(), value) for name, value in attrs)
+        attributes = dict(normalized_attrs)
         self._record_attributes(normalized_tag, attrs)
 
         if normalized_tag == "html":
@@ -160,7 +165,10 @@ class ContractParser(HTMLParser):
             self.sections += 1
         elif normalized_tag == "script":
             self.scripts += 1
-            record = {"attrs": attributes, "body": []}
+            duplicate_attributes = frozenset(
+                name for name, _ in normalized_attrs if sum(1 for current, _ in normalized_attrs if current == name) > 1
+            )
+            record = {"attrs": attributes, "attr_items": normalized_attrs, "duplicate_attributes": duplicate_attributes, "body": []}
             self.script_records.append(record)
             self._script_stack.append(record)
         elif normalized_tag == "style":
@@ -406,6 +414,8 @@ def enforce_hub_scripts(parser: ContractParser, errors: list[str]) -> None:
     for record in parser.script_records:
         attrs = record["attrs"]
         script_id = attrs.get("id")
+        if record["duplicate_attributes"]:
+            append_once(errors, "hub-script-attributes-invalid")
         if script_id not in ALLOWED_HUB_SCRIPTS:
             append_once(errors, "hub-script-not-allowlisted")
             continue
@@ -434,6 +444,8 @@ def enforce_hub_scripts(parser: ContractParser, errors: list[str]) -> None:
         if data_type != "application/json" or not valid_json or not isinstance(data_payload, dict):
             append_once(errors, "hub-data-script-invalid")
     status = data_payload.get("status") if isinstance(data_payload, dict) else None
+    if not isinstance(status, str) or status not in HUB_ALLOWED_STATUSES:
+        append_once(errors, "hub-status-invalid")
     if len(refresh_scripts) > 1:
         append_once(errors, "hub-refresh-script-invalid")
     elif refresh_scripts:
@@ -444,7 +456,7 @@ def enforce_hub_scripts(parser: ContractParser, errors: list[str]) -> None:
             append_once(errors, "hub-refresh-script-invalid")
     if status in HUB_ACTIVE_STATUSES and not refresh_scripts:
         append_once(errors, "hub-refresh-script-invalid")
-    if status == "closed" and refresh_scripts:
+    if refresh_scripts and status not in HUB_ACTIVE_STATUSES:
         append_once(errors, "hub-refresh-script-invalid")
 
 

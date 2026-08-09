@@ -32,6 +32,11 @@ try:
 except ImportError:
     render_hub = None
 
+try:
+    from validate_lesson_html import HUB_ACTIVE_STATUSES
+except ImportError:
+    HUB_ACTIVE_STATUSES = ()
+
 FIXTURES = Path(__file__).parent / "fixtures"
 ASSETS = SCRIPT_DIR.parent / "assets"
 THEME = ASSETS / "lesson-theme.css"
@@ -87,12 +92,18 @@ class RenderLessonTest(unittest.TestCase):
         self.assertEqual("passed", report["overall"], report["errors"])
 
     def test_awaiting_voice_and_unsynced_hubs_refresh_but_closed_hub_keeps_links(self):
-        for status in ("awaiting-voice", "unsynced"):
+        for status in HUB_ACTIVE_STATUSES:
             with self.subTest(status=status):
                 self.assertIn('id="lesson-refresh"', self.render_hub_html(status))
         closed = self.render_hub_html("closed")
         self.assertNotIn('id="lesson-refresh"', closed)
         self.assertIn("visuals/001-responsibility-map.html", closed)
+
+    def test_hub_renderer_rejects_unknown_or_whitespace_variant_statuses(self):
+        for status in ("unknown", "closed ", " studying"):
+            with self.subTest(status=status):
+                with self.assertRaisesRegex(ValueError, "hub status"):
+                    self.render_hub_html(status)
 
     def test_hub_data_json_cannot_break_out_of_its_script_element(self):
         model = copy.deepcopy(BASE_MODEL)

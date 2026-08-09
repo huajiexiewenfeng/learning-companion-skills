@@ -10,7 +10,7 @@ from string import Template
 from typing import Any, Callable, Mapping
 
 from lesson_model import RELATIONAL_TYPES, slugify
-from validate_lesson_html import HUB_ACTIVE_STATUSES, HUB_REFRESH_BODY
+from validate_lesson_html import HUB_ACTIVE_STATUSES, HUB_ALLOWED_STATUSES, HUB_REFRESH_BODY
 
 
 TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
@@ -539,8 +539,8 @@ def _legacy_hub_artifacts(model: Mapping[str, Any], decks: tuple[Mapping[str, An
 def _render_hub_html(
     model: Mapping[str, Any], artifacts: tuple[Mapping[str, Any], ...], status: str, theme_css: str
 ) -> str:
-    if not isinstance(status, str):
-        raise ValueError("hub status must be a string")
+    if not isinstance(status, str) or status not in HUB_ALLOWED_STATUSES:
+        raise ValueError("hub status must be an allowlisted lifecycle state")
     session = model["session"]
     records = _hub_artifacts(artifacts)
     outline = "".join(

@@ -5,12 +5,18 @@ import tempfile
 from pathlib import Path
 import sys
 import unittest
+import hashlib
 
 
 SCRIPT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from validate_lesson_html import validate_html
+from validate_lesson_html import (
+    HUB_ACTIVE_STATUSES,
+    HUB_REFRESH_BODY,
+    HUB_REFRESH_BODY_SHA256,
+    validate_html,
+)
 
 
 DOCUMENT_HTML = """<!doctype html>
@@ -23,21 +29,28 @@ TECHNICAL_VISUAL_HTML = DOCUMENT_HTML.replace(
     "<svg role=\"img\"><title>交付关系</title><desc>模型能力通向可靠交付</desc><g data-node-id=\"model\"></g><g data-node-id=\"delivery\"></g><path data-edge-from=\"model\" data-edge-to=\"delivery\" d=\"M0 0L1 1\" /></svg>可靠交付</section>",
 )
 
-HUB_HTML = """<!doctype html>
+APPROVED_HUB_REFRESH_BODY_SHA256 = "c74305cd5efdf45e05e60680f948c0f58ccab9d99ac1a1d79e62e8fda57ee099"
+
+
+def hub_data_script(status):
+    payload = json.dumps({"status": status, "title": "企业 AI 系统分层"}, ensure_ascii=False, separators=(",", ":"))
+    return '<script id="lesson-data" type="application/json">' + payload + "</script>"
+
+
+def hub_html(status="studying", include_refresh=True):
+    refresh = (
+        f'<script id="lesson-refresh" data-contract="v1">{HUB_REFRESH_BODY}</script>'
+        if include_refresh
+        else ""
+    )
+    return """<!doctype html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <style>@media (max-width: 390px) {.layout { display: block; }} @media (prefers-reduced-motion: reduce) {* { animation: none; }} @media (prefers-color-scheme: dark) {body { color-scheme: dark; }}</style></head>
 <body><section class="layout">企业 AI 系统分层</section>
-<script id="lesson-data" type="application/json">{"title":"企业 AI 系统分层"}</script>
-<script id="lesson-refresh" data-contract="v1">(() => {
-  const key = `learning-companion-scroll:${location.pathname}`;
-  addEventListener("beforeunload", () => sessionStorage.setItem(key, String(scrollY)));
-  addEventListener("load", () => {
-    const saved = Number(sessionStorage.getItem(key) || "0");
-    if (Number.isFinite(saved)) scrollTo(0, saved);
-  });
-  setTimeout(() => location.reload(), 5000);
-})();</script>
-</body></html>"""
+""" + hub_data_script(status) + "\n" + refresh + "</body></html>"
+
+
+HUB_HTML = hub_html()
 
 
 class ValidateLessonHtmlTest(unittest.TestCase):
@@ -64,6 +77,10 @@ class ValidateLessonHtmlTest(unittest.TestCase):
         injected = HUB_HTML.replace("</body>", "<script>alert(1)</script></body>")
         self.assertIn("hub-script-not-allowlisted", validate_html(self.write(injected), (), "hub")["errors"])
 
+    def test_refresh_hash_literal_is_pinned_to_the_approved_body(self):
+        self.assertEqual(APPROVED_HUB_REFRESH_BODY_SHA256, HUB_REFRESH_BODY_SHA256)
+        self.assertEqual(APPROVED_HUB_REFRESH_BODY_SHA256, hashlib.sha256(HUB_REFRESH_BODY.encode("utf-8")).hexdigest())
+
     def test_document_applies_the_visual_companion_shared_contract(self):
         cases = (
             ("utf8 bom", DOCUMENT_HTML.encode("utf-8-sig"), "utf8-bom"),
@@ -87,7 +104,7 @@ class ValidateLessonHtmlTest(unittest.TestCase):
         self.assertEqual("passed", validate_html(self.write(xhtml_void), (), "document")["overall"])
 
     def test_hub_requires_one_json_data_script_and_exact_refresh_body(self):
-        missing_data = HUB_HTML.replace('<script id="lesson-data" type="application/json">{"title":"企业 AI 系统分层"}</script>', "")
+        missing_data = HUB_HTML.replace(hub_data_script("studying"), "")
         self.assertIn("hub-data-script-invalid", validate_html(self.write(missing_data), (), "hub")["errors"])
         changed_refresh = HUB_HTML.replace("5000", "5001")
         self.assertIn("hub-refresh-script-invalid", validate_html(self.write(changed_refresh), (), "hub")["errors"])
@@ -99,6 +116,29 @@ class ValidateLessonHtmlTest(unittest.TestCase):
         self.assertIn("hub-script-attributes-invalid", validate_html(self.write(unexpected), (), "hub")["errors"])
         invalid_contract = HUB_HTML.replace('data-contract="v1"', 'data-contract="v2"')
         self.assertIn("hub-script-attributes-invalid", validate_html(self.write(invalid_contract), (), "hub")["errors"])
+
+    def test_hub_rejects_browser_differential_duplicate_script_attributes(self):
+        cases = (
+            ("duplicate data id", HUB_HTML.replace('id="lesson-data"', 'id="untrusted" id="lesson-data"'), "hub-script-attributes-invalid"),
+            ("duplicate data type", HUB_HTML.replace('type="application/json"', 'type="text/javascript" type="application/json"'), "hub-script-attributes-invalid"),
+            ("duplicate refresh id", HUB_HTML.replace('id="lesson-refresh"', 'id="untrusted" id="lesson-refresh"'), "hub-script-attributes-invalid"),
+            ("duplicate refresh contract", HUB_HTML.replace('data-contract="v1"', 'data-contract="v2" data-contract="v1"'), "hub-script-attributes-invalid"),
+            ("duplicate unexpected nonce", HUB_HTML.replace('data-contract="v1"', 'data-contract="v1" nonce="a" nonce="b"'), "hub-script-attributes-invalid"),
+        )
+        for name, markup, expected in cases:
+            with self.subTest(name=name):
+                errors = validate_html(self.write(markup), (), "hub")["errors"]
+                self.assertIn("malformed-html", errors)
+                self.assertIn(expected, errors)
+
+    def test_hub_requires_an_explicit_allowlisted_refresh_status(self):
+        for status in HUB_ACTIVE_STATUSES:
+            with self.subTest(status=status):
+                self.assertEqual("passed", validate_html(self.write(hub_html(status)), (), "hub")["overall"])
+        self.assertEqual("passed", validate_html(self.write(hub_html("closed", include_refresh=False)), (), "hub")["overall"])
+        for status, include_refresh in (("unknown", False), ("unknown", True), ("closed ", False), ("closed ", True)):
+            with self.subTest(status=status, include_refresh=include_refresh):
+                self.assertIn("hub-status-invalid", validate_html(self.write(hub_html(status, include_refresh)), (), "hub")["errors"])
 
     def test_hub_allows_only_contained_artifact_links(self):
         contained = HUB_HTML.replace("企业 AI 系统分层</section>", '企业 AI 系统分层 <a href="visuals/001-responsibility-map.html">map</a></section>')
@@ -124,7 +164,7 @@ class ValidateLessonHtmlTest(unittest.TestCase):
             ("unclosed root", DOCUMENT_HTML.replace("</body></html>", "</body>")),
             ("misnested tag", DOCUMENT_HTML.replace("模型能力", "<b>模型能力</i>")),
             ("unclosed svg", TECHNICAL_VISUAL_HTML.replace("</svg>", "")),
-            ("unclosed script", HUB_HTML.replace("</script>\n</body>", "\n</body>", 1)),
+            ("unclosed script", HUB_HTML.rsplit("</script>", 1)[0] + "</body></html>"),
             ("bad ordering", DOCUMENT_HTML.replace("</head><body>", "</head></html><body>")),
             ("duplicate attribute", DOCUMENT_HTML.replace('class="layout"', 'class="layout" class="again"')),
         )
