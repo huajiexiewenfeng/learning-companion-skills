@@ -16,7 +16,7 @@
     {
       "id": "system-layers",
       "title": "企业 AI 系统分层主课件",
-      "sectionIds": ["core-concept", "runtime-flow"]
+      "sectionIds": ["core-concept", "runtime-flow", "authority-layers", "system-boundaries", "delivery-timeline"]
     }
   ],
   "sections": [
@@ -46,6 +46,54 @@
       "sourceRefs": [
         "enterprise-ai-transformation-runtime-learning-plan-v4-preview.zh.md#Day-1"
       ]
+    },
+    {
+      "id": "authority-layers",
+      "type": "layer-map",
+      "title": "权威状态分层",
+      "summary": "状态由记录层托底，再由流程层和体验层使用。",
+      "nodes": [
+        {"id": "record", "label": "Authoritative State", "kind": "success"},
+        {"id": "workflow-layer", "label": "流程编排", "kind": "active"},
+        {"id": "experience", "label": "业务体验", "kind": "neutral"}
+      ],
+      "edges": [
+        {"from": "record", "to": "workflow-layer", "label": "提供事实"},
+        {"from": "workflow-layer", "to": "experience", "label": "呈现结果"}
+      ],
+      "sourceRefs": ["dashboard.md#Today"]
+    },
+    {
+      "id": "system-boundaries",
+      "type": "boundary-map",
+      "title": "系统边界与门禁",
+      "summary": "模型输出跨越工具边界时必须经过风险门禁。",
+      "nodes": [
+        {"id": "assistant", "label": "模型输出", "kind": "neutral"},
+        {"id": "gateway", "label": "工具网关", "kind": "gate"},
+        {"id": "review", "label": "风险复核", "kind": "risk"}
+      ],
+      "edges": [
+        {"from": "assistant", "to": "gateway", "label": "请求工具"},
+        {"from": "gateway", "to": "review", "label": "触发复核"}
+      ],
+      "sourceRefs": ["dashboard.md#Today"]
+    },
+    {
+      "id": "delivery-timeline",
+      "type": "timeline",
+      "title": "可靠交付时间线",
+      "summary": "交付按证据、执行和验收的顺序推进。",
+      "nodes": [
+        {"id": "prepare", "label": "准备证据", "kind": "success"},
+        {"id": "operate", "label": "执行变更", "kind": "active"},
+        {"id": "accept", "label": "完成验收", "kind": "gate"}
+      ],
+      "edges": [
+        {"from": "prepare", "to": "operate", "label": "进入执行"},
+        {"from": "operate", "to": "accept", "label": "提交验收"}
+      ],
+      "sourceRefs": ["dashboard.md#Today"]
     }
   ]
 }

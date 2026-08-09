@@ -86,66 +86,197 @@ def render_sources(section: Mapping[str, Any]) -> str:
     return _section_shell(section, "Source guide")
 
 
-def _diagram(section: Mapping[str, Any]) -> str:
-    nodes = tuple(section.get("nodes", ()))
-    node_ids = {node["id"]: f"node-{index}" for index, node in enumerate(nodes)}
-    node_labels = {node["id"]: node["label"] for node in nodes}
-    positions = {
-        node["id"]: (20 + (index % 3) * 210, 45 + (index // 3) * 95)
-        for index, node in enumerate(nodes)
-    }
-    node_markup = "".join(
-        '<g class="diagram-node" data-node-id="{identifier}" transform="translate({x} {y})">'
-        '<rect width="180" height="54" rx="10"></rect>'
-        '<text x="90" y="32" text-anchor="middle">{label}</text></g>'.format(
-            identifier=node_ids[node["id"]],
-            x=positions[node["id"]][0],
-            y=positions[node["id"]][1],
-            label=_text(node["label"]),
-        )
-        for index, node in enumerate(nodes)
-    )
-    declared_edges = tuple(
-        edge
-        for edge in section.get("edges", ())
-        if edge["from"] in node_ids
-        and edge["to"] in node_ids
-        and edge["from"] != edge["to"]
-    )
-    if not declared_edges:
+NODE_WIDTH = 200
+NODE_HEIGHT = 72
+SEMANTIC_KINDS = frozenset({"active", "success", "gate", "risk", "neutral"})
+NODE_COLOR_VARIABLES = {
+    "active": "--color-active",
+    "success": "--color-success",
+    "gate": "--color-gate",
+    "risk": "--color-risk",
+    "neutral": "--color-neutral",
+}
+
+
+def relation_positions(section_type: str, node_count: int) -> tuple[tuple[int, int], ...]:
+    """Return stable, type-specific positions within the fixed SVG view box."""
+    if node_count < 2:
         raise ValueError("relational section requires a declared edge between distinct nodes")
-    edge_markup = "".join(
-        '<path class="diagram-edge" data-edge-from="{source}" data-edge-to="{target}" d="M {start_x} {start_y} L {end_x} {end_y}"></path>'
-        '<text class="diagram-edge-label" x="{label_x}" y="{label_y}">{label}</text>'.format(
-            source=node_ids[edge["from"]],
-            target=node_ids[edge["to"]],
-            start_x=positions[edge["from"]][0] + 180,
-            start_y=positions[edge["from"]][1] + 27,
-            end_x=positions[edge["to"]][0],
-            end_y=positions[edge["to"]][1] + 27,
-            label_x=(positions[edge["from"]][0] + 180 + positions[edge["to"]][0]) // 2,
-            label_y=(positions[edge["from"]][1] + positions[edge["to"]][1] + 54) // 2,
-            label=_text(edge.get("label", "")),
+
+    if section_type in {"flow", "timeline"}:
+        span = 800
+        return tuple((40 + round(index * span / (node_count - 1)), 170) for index in range(node_count))
+    if section_type == "layer-map":
+        span = 320
+        return tuple((330, 40 + round(index * span / (node_count - 1))) for index in range(node_count))
+    if section_type == "boundary-map":
+        rows = (node_count + 1) // 2
+        row_span = 280 if rows > 1 else 0
+        return tuple(
+            (90 if index % 2 == 0 else 650, 100 + round((index // 2) * row_span / max(rows - 1, 1)))
+            for index in range(node_count)
         )
-        for edge in declared_edges
+    raise ValueError(f"unsupported relational section type: {section_type}")
+
+
+def _relation_nodes(section: Mapping[str, Any]) -> tuple[Mapping[str, Any], ...]:
+    nodes = section.get("nodes")
+    if not isinstance(nodes, (list, tuple)) or len(nodes) < 2:
+        raise ValueError("relational section requires a declared edge between distinct nodes")
+    if not all(isinstance(node, Mapping) for node in nodes):
+        raise ValueError("relational section requires declared nodes")
+    if any(
+        not isinstance(node.get("id"), str)
+        or not node["id"]
+        or not isinstance(node.get("label"), str)
+        or not node["label"]
+        for node in nodes
+    ):
+        raise ValueError("relational section requires declared nodes")
+    if len({node["id"] for node in nodes}) != len(nodes):
+        raise ValueError("relational section requires unique node IDs")
+    return tuple(nodes)
+
+
+def _relation_edges(
+    section: Mapping[str, Any], node_ids: set[str]
+) -> tuple[Mapping[str, Any], ...]:
+    edges = section.get("edges")
+    if not isinstance(edges, (list, tuple)) or not edges:
+        raise ValueError("relational section requires a declared edge between distinct nodes")
+    if not all(isinstance(edge, Mapping) for edge in edges):
+        raise ValueError("relational section requires declared edges")
+    if any(
+        not isinstance(edge.get("from"), str)
+        or not isinstance(edge.get("to"), str)
+        or edge["from"] not in node_ids
+        or edge["to"] not in node_ids
+        or edge["from"] == edge["to"]
+        or ("label" in edge and not isinstance(edge["label"], str))
+        for edge in edges
+    ):
+        raise ValueError("relational section requires a declared edge between distinct nodes")
+    return tuple(edges)
+
+
+def _node_kind(node: Mapping[str, Any]) -> str:
+    kind = node.get("kind")
+    return kind if isinstance(kind, str) and kind in SEMANTIC_KINDS else "neutral"
+
+
+def _edge_points(source: tuple[int, int], target: tuple[int, int]) -> tuple[int, int, int, int]:
+    source_x, source_y = source
+    target_x, target_y = target
+    horizontal = abs(target_x - source_x) >= abs(target_y - source_y)
+    if horizontal:
+        if target_x >= source_x:
+            return source_x + NODE_WIDTH, source_y + NODE_HEIGHT // 2, target_x, target_y + NODE_HEIGHT // 2
+        return source_x, source_y + NODE_HEIGHT // 2, target_x + NODE_WIDTH, target_y + NODE_HEIGHT // 2
+    if target_y >= source_y:
+        return source_x + NODE_WIDTH // 2, source_y + NODE_HEIGHT, target_x + NODE_WIDTH // 2, target_y
+    return source_x + NODE_WIDTH // 2, source_y, target_x + NODE_WIDTH // 2, target_y + NODE_HEIGHT
+
+
+def _render_svg_node(node: Mapping[str, Any], identifier: str, position: tuple[int, int]) -> str:
+    x, y = position
+    kind = _node_kind(node)
+    color = NODE_COLOR_VARIABLES[kind]
+    return (
+        f'<g class="diagram-node diagram-node--{kind}" data-node-id="{identifier}" '
+        f'transform="translate({x} {y})"><rect width="{NODE_WIDTH}" height="{NODE_HEIGHT}" '
+        f'rx="12" style="stroke:var({color})"></rect><text x="{NODE_WIDTH // 2}" y="43" text-anchor="middle">'
+        f'{_text(node["label"])}</text></g>'
     )
-    description = "; ".join(
-        "{} {} {}".format(
-            node_labels[edge["from"]],
-            edge.get("label") or "connects to",
-            node_labels[edge["to"]],
-        )
-        for edge in declared_edges
+
+
+def _render_svg_edge(
+    edge: Mapping[str, Any],
+    positions: Mapping[str, tuple[int, int]],
+    node_identifiers: Mapping[str, str],
+    marker_id: str,
+) -> str:
+    start_x, start_y, end_x, end_y = _edge_points(positions[edge["from"]], positions[edge["to"]])
+    label = edge.get("label", "")
+    return (
+        f'<path class="diagram-edge" data-edge-from="{node_identifiers[edge["from"]]}" '
+        f'data-edge-to="{node_identifiers[edge["to"]]}" marker-end="url(#{marker_id})" '
+        f'd="M {start_x} {start_y} L {end_x} {end_y}"></path>'
+        f'<text class="diagram-edge-label" x="{(start_x + end_x) // 2}" '
+        f'y="{(start_y + end_y) // 2 - 10}">{_text(label)}</text>'
     )
+
+
+def _render_mobile_relation(
+    nodes: tuple[Mapping[str, Any], ...], edges: tuple[Mapping[str, Any], ...]
+) -> str:
+    labels = {node["id"]: node["label"] for node in nodes}
+    node_items = "".join(
+        f'<li class="mobile-flow-node mobile-flow-node--{_node_kind(node)}">'
+        f'<strong>{_text(node["label"])}</strong></li>'
+        for node in nodes
+    )
+    edge_items = "".join(
+        f'<li class="mobile-flow-relation"><strong>{_text(labels[edge["from"]])}</strong> '
+        f'<span>{_text(edge.get("label", ""))}</span> '
+        f'<strong>{_text(labels[edge["to"]])}</strong></li>'
+        for edge in edges
+    )
+    return f'<ol class="mobile-semantic-flow">{node_items}{edge_items}</ol>'
+
+
+def render_relation(section: Mapping[str, Any]) -> str:
+    """Render only declared relation facts as an accessible desktop/mobile diagram."""
+    section_type = section.get("type")
+    if section_type not in RELATIONAL_TYPES:
+        raise ValueError(f"unsupported relational section type: {section_type}")
+    if not isinstance(section.get("id"), str) or not isinstance(section.get("title"), str) or not isinstance(section.get("summary"), str):
+        raise ValueError("relational section requires an ID, title, and summary")
+
+    nodes = _relation_nodes(section)
+    node_identifiers = {node["id"]: f"node-{index}" for index, node in enumerate(nodes)}
+    edges = _relation_edges(section, set(node_identifiers))
+    positions = {
+        node["id"]: position
+        for node, position in zip(nodes, relation_positions(section_type, len(nodes)))
+    }
+    identifier = slugify(section["id"]) or "relation"
+    title_id = f"{identifier}-title"
+    description_id = f"{identifier}-desc"
+    marker_id = f"{identifier}-arrow"
+    boundaries = (
+        '<g class="diagram-boundaries" aria-hidden="true"><rect class="diagram-boundary" '
+        'x="40" y="50" width="430" height="380" rx="20"></rect><rect class="diagram-boundary" '
+        'x="570" y="50" width="430" height="380" rx="20"></rect></g>'
+        if section_type == "boundary-map"
+        else ""
+    )
+    marker = (
+        f'<defs><marker id="{marker_id}" viewBox="0 0 10 10" refX="8" refY="5" '
+        'markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"></path>'
+        '</marker></defs>'
+    )
+    svg_edges = "".join(
+        _render_svg_edge(edge, positions, node_identifiers, marker_id) for edge in edges
+    )
+    svg_nodes = "".join(
+        _render_svg_node(node, node_identifiers[node["id"]], positions[node["id"]])
+        for node in nodes
+    )
+    desktop = (
+        f'<svg class="desktop-diagram diagram--{section_type}" viewBox="0 0 1040 480" role="img" '
+        f'aria-labelledby="{title_id} {description_id}"><title id="{title_id}">{_text(section["title"])}</title>'
+        f'<desc id="{description_id}">{_text(section["summary"])}</desc>{marker}{boundaries}{svg_edges}{svg_nodes}</svg>'
+    )
+    return desktop + _render_mobile_relation(nodes, edges)
+
+
+def _diagram(section: Mapping[str, Any]) -> str:
     return (
         '<article class="lesson-card"><section class="panel technical-visual" aria-labelledby="lesson-title">'
         '<p class="eyebrow">Systems relationship</p>'
         f'<h1 id="lesson-title">{_text(section["title"])}</h1>'
         f'<p class="summary">{_text(section["summary"])}</p>'
-        '<svg role="img" viewBox="0 0 660 360" aria-labelledby="diagram-title diagram-description">'
-        f'<title id="diagram-title">{_text(section["title"])}</title>'
-        f'<desc id="diagram-description">{_text(description)}</desc>'
-        f"{edge_markup}{node_markup}</svg></section>{_source_list(section)}</article>"
+        f'{render_relation(section)}</section>{_source_list(section)}</article>'
     )
 
 

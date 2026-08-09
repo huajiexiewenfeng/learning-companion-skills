@@ -21,6 +21,11 @@ try:
 except ImportError:
     required_terms_for_section = None
 
+try:
+    from render_lesson import render_relation
+except ImportError:
+    render_relation = None
+
 
 FIXTURES = Path(__file__).parent / "fixtures"
 ASSETS = SCRIPT_DIR.parent / "assets"
@@ -69,15 +74,83 @@ class RenderLessonTest(unittest.TestCase):
         self.assertEqual("cards/unsafe-id.html", artifact.relative_path)
         self.assert_valid(artifact)
 
-    def test_relational_section_is_a_valid_technical_visual(self):
+    def test_all_relation_types_have_accessible_svg_and_mobile_equivalent(self):
+        relation_types = ("layer-map", "boundary-map", "flow", "timeline")
+        for section_type in relation_types:
+            with self.subTest(section_type=section_type):
+                section = next(
+                    item for item in BASE_MODEL["sections"] if item["type"] == section_type
+                )
+                artifact = self.render(BASE_MODEL, section)
+                self.assertEqual("technical-visual", artifact.profile)
+                self.assertIn('class="desktop-diagram', artifact.html)
+                self.assertIn('role="img"', artifact.html)
+                self.assertIn(
+                    f'<title id="{section["id"]}-title">{section["title"]}</title>',
+                    artifact.html,
+                )
+                self.assertIn(
+                    f'<desc id="{section["id"]}-desc">{section["summary"]}</desc>',
+                    artifact.html,
+                )
+                mobile = artifact.html.split('<ol class="mobile-semantic-flow">', 1)[1]
+                for node in section["nodes"]:
+                    self.assertIn(node["label"], mobile)
+                for edge in section["edges"]:
+                    self.assertIn(edge["label"], mobile)
+                self.assert_valid(artifact)
+
+    def test_relation_edges_keep_declared_order(self):
         section = next(item for item in BASE_MODEL["sections"] if item["type"] == "flow")
-        artifact = self.render(BASE_MODEL, section)
-        self.assertEqual("technical-visual", artifact.profile)
-        self.assertIn('<svg role="img"', artifact.html)
-        self.assertIn('data-node-id="node-0"', artifact.html)
-        self.assertIn('data-edge-from="node-0" data-edge-to="node-1"', artifact.html)
-        self.assertIn('d="M 200 72 L 230 72"', artifact.html)
-        self.assert_valid(artifact)
+        html = self.render(BASE_MODEL, section).html
+        self.assertLess(html.index("核对"), html.index("执行"))
+        self.assertLess(html.index("执行"), html.index("验收"))
+
+    def test_relation_geometry_is_type_specific_and_stable(self):
+        expected = {
+            "flow": ('class="desktop-diagram diagram--flow"', 'translate(40 170)'),
+            "timeline": ('class="desktop-diagram diagram--timeline"', 'translate(40 170)'),
+            "layer-map": ('class="desktop-diagram diagram--layer-map"', 'translate(330 40)'),
+            "boundary-map": ('class="desktop-diagram diagram--boundary-map"', 'class="diagram-boundary"'),
+        }
+        for section_type, tokens in expected.items():
+            with self.subTest(section_type=section_type):
+                section = next(
+                    item for item in BASE_MODEL["sections"] if item["type"] == section_type
+                )
+                html = self.render(BASE_MODEL, section).html
+                for token in tokens:
+                    self.assertIn(token, html)
+
+    def test_relation_nodes_use_fixed_semantic_kind_classes(self):
+        html = "\n".join(
+            self.render(BASE_MODEL, section).html
+            for section in BASE_MODEL["sections"]
+            if section["type"] in {"layer-map", "boundary-map", "flow", "timeline"}
+        )
+        colors = {
+            "active": "--color-active",
+            "success": "--color-success",
+            "gate": "--color-gate",
+            "risk": "--color-risk",
+            "neutral": "--color-neutral",
+        }
+        for kind, color in colors.items():
+            self.assertIn(f'diagram-node--{kind}', html)
+            self.assertIn(f'stroke:var({color})', html)
+
+    def test_relation_renderer_fails_closed_for_invalid_relationships(self):
+        self.assertIsNotNone(render_relation, "the relationship renderer must exist")
+        invalid = {
+            "id": "broken-flow",
+            "type": "flow",
+            "title": "Broken relationship",
+            "summary": "An undeclared endpoint must not be rendered.",
+            "nodes": [{"id": "known", "label": "Known", "kind": "neutral"}],
+            "edges": [{"from": "known", "to": "missing", "label": "Cannot continue"}],
+        }
+        with self.assertRaisesRegex(ValueError, "declared edge"):
+            render_relation(invalid)
 
     def test_network_like_model_text_is_visible_without_failing_validation(self):
         model = copy.deepcopy(BASE_MODEL)
