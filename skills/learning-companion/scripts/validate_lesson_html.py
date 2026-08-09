@@ -112,7 +112,8 @@ class ContractParser(HTMLParser):
         self.svg_records: list[dict[str, Any]] = []
         self.script_records: list[dict[str, Any]] = []
         self.style_records: list[list[str]] = []
-        self.content_chunks: list[str] = []
+        self.inline_style_records: list[str] = []
+        self.visible_text_chunks: list[str] = []
         self._tag_stack: list[str] = []
         self._svg_stack: list[dict[str, Any]] = []
         self._script_stack: list[dict[str, Any]] = []
@@ -209,7 +210,11 @@ class ContractParser(HTMLParser):
     def handle_data(self, data: str) -> None:
         if not self._tag_stack and data.strip():
             self.mark_malformed()
-        self.content_chunks.append(data)
+        non_visible_contexts = {"script", "style", "template", "title", "desc"}
+        if "body" in self._tag_stack and not any(
+            tag in non_visible_contexts for tag in self._tag_stack
+        ):
+            self.visible_text_chunks.append(data)
         if self._script_stack:
             self._script_stack[-1]["body"].append(data)
         if self._style_stack:
@@ -259,6 +264,8 @@ class ContractParser(HTMLParser):
             normalized_name = name.lower()
             if normalized_name.startswith("on"):
                 self.event_handlers.append(normalized_name)
+            if normalized_name == "style" and value is not None:
+                self.inline_style_records.append(value)
             if normalized_name in RESOURCE_ATTRIBUTES and value is not None:
                 violation = url_violation(value)
                 if violation == "external-resource-forbidden":
@@ -320,13 +327,9 @@ def enforce_shared_contract(
         append_once(errors, "svg-accessibility-incomplete")
 
     css = effective_css(["".join(record) for record in parser.style_records])
-    for match in CSS_URL.finditer(css):
-        value = match.group(2) if match.group(1) is not None else match.group(3)
-        violation = url_violation(value)
-        if violation:
-            append_once(errors, violation)
-    if re.search(r"@import\b", CSS_STRING.sub("", css), re.IGNORECASE):
-        append_once(errors, "network-reference-forbidden")
+    inline_css = effective_css(parser.inline_style_records)
+    enforce_css_contract(css, errors)
+    enforce_css_contract(inline_css, errors)
     executable_script_text = "\n".join(
         "".join(record["body"])
         for record in parser.script_records
@@ -342,9 +345,24 @@ def enforce_shared_contract(
         append_once(errors, "color-scheme-rule-missing")
     if len(raw) > max_bytes:
         append_once(errors, "size-limit-exceeded")
+    visible_text = "\n".join(parser.visible_text_chunks)
     for term in required_terms:
-        if term not in text:
+        if term not in visible_text:
             append_once(errors, f"required-term-missing:{term}")
+
+
+def enforce_css_contract(css: str, errors: list[str]) -> None:
+    """Reject external or executable CSS after comment and escape normalization."""
+    for match in CSS_URL.finditer(css):
+        value = match.group(2) if match.group(1) is not None else match.group(3)
+        violation = url_violation(value)
+        if violation:
+            append_once(errors, violation)
+    if re.search(r"@import\b", CSS_STRING.sub("", css), re.IGNORECASE):
+        append_once(errors, "network-reference-forbidden")
+    css_code = CSS_STRING.sub("", css)
+    if any(pattern.search(css_code) for pattern in NETWORK_PATTERNS):
+        append_once(errors, "network-reference-forbidden")
 
 
 def has_relational_svg(parser: ContractParser) -> bool:

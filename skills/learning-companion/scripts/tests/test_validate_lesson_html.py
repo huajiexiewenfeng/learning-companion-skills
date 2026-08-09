@@ -142,6 +142,71 @@ class ValidateLessonHtmlTest(unittest.TestCase):
             validate_html(self.write(resource), (), "document")["errors"],
         )
 
+    def test_required_terms_use_decoded_visible_text_only(self):
+        citation = "https://example.test/reference?a=1&b=2"
+        visible = DOCUMENT_HTML.replace(
+            "模型能力", "https://example.test/reference?a=1&amp;b=2"
+        )
+        self.assertEqual(
+            "passed", validate_html(self.write(visible), (citation,), "document")["overall"]
+        )
+        attribute_only = DOCUMENT_HTML.replace(
+            'class="layout"', f'class="layout" data-citation="{citation}"'
+        )
+        self.assertIn(
+            f"required-term-missing:{citation}",
+            validate_html(self.write(attribute_only), (citation,), "document")["errors"],
+        )
+        style_only = DOCUMENT_HTML.replace(
+            "</style>", " .layout::before { content: 'style-only-obligation'; }</style>"
+        )
+        self.assertIn(
+            "required-term-missing:style-only-obligation",
+            validate_html(self.write(style_only), ("style-only-obligation",), "document")["errors"],
+        )
+
+    def test_rejects_executable_and_inline_style_network_contexts(self):
+        cases = (
+            (
+                "escaped expression fetch",
+                DOCUMENT_HTML.replace(
+                    "</style>", r"body { width: e/**/xpression(\66 etch()); }</style>"
+                ),
+                "network-reference-forbidden",
+            ),
+            (
+                "websocket css identifier",
+                DOCUMENT_HTML.replace("</style>", "body { behavior: WebSocket; }</style>"),
+                "network-reference-forbidden",
+            ),
+            (
+                "obfuscated xml http css identifier",
+                DOCUMENT_HTML.replace(
+                    "</style>", "body { behavior: XML/**/HttpRequest; }</style>"
+                ),
+                "network-reference-forbidden",
+            ),
+            (
+                "inline css url",
+                DOCUMENT_HTML.replace(
+                    '<section class="layout">',
+                    '<section class="layout" style="background: url(https://example.test/a.png);">',
+                ),
+                "external-resource-forbidden",
+            ),
+            (
+                "inline css import",
+                DOCUMENT_HTML.replace(
+                    '<section class="layout">',
+                    '<section class="layout" style="@import url(https://example.test/a.css);">',
+                ),
+                "network-reference-forbidden",
+            ),
+        )
+        for name, markup, expected in cases:
+            with self.subTest(name=name):
+                self.assertIn(expected, validate_html(self.write(markup), (), "document")["errors"])
+
     def test_rejects_css_imports_and_urls_after_css_escape_normalization(self):
         cases = (
             ("local import", "@import url(local.css);", "network-reference-forbidden"),
