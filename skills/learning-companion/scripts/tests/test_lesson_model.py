@@ -89,12 +89,22 @@ class LessonModelTest(unittest.TestCase):
                 mutate(model)
                 self.assertIn(expected_code, self.issue_codes(model))
 
+    def test_decks_are_optional_but_not_nullable(self):
+        model_without_decks = self.valid_model()
+        model_without_decks.pop("decks")
+        self.assertEqual(set(), self.issue_codes(model_without_decks))
+
+        model_with_null_decks = self.valid_model()
+        model_with_null_decks["decks"] = None
+        self.assertIn("decks-invalid", self.issue_codes(model_with_null_decks))
+
     def test_source_id_and_deck_reference_constraints(self):
         cases = (
             ("empty source refs", lambda model: model["sections"][0].update(sourceRefs=[]), "sources-empty"),
             ("duplicate section id", lambda model: model["sections"][1].update(id="core-concept"), "section-id-duplicate"),
             ("duplicate node id", lambda model: model["sections"][1]["nodes"][1].update(id="model"), "node-id-duplicate"),
             ("duplicate deck id", lambda model: model["decks"].append(copy.deepcopy(model["decks"][0])), "deck-id-duplicate"),
+            ("duplicate deck title", lambda model: model["decks"].append({"id": "other-deck", "title": model["decks"][0]["title"], "sectionIds": ["core-concept"]}), "deck-title-duplicate"),
             ("missing deck section", lambda model: model["decks"][0].update(sectionIds=["missing"]), "deck-section-missing"),
         )
         for name, mutate, expected_code in cases:

@@ -88,7 +88,8 @@ def validate_lesson_model(data: Mapping[str, Any]) -> tuple[ValidationIssue, ...
     _validate_required_terms(data.get("requiredTerms"), issues)
 
     section_ids = _validate_sections(data.get("sections"), issues)
-    _validate_decks(data.get("decks"), section_ids, issues)
+    if "decks" in data:
+        _validate_decks(data["decks"], section_ids, issues)
     return tuple(issues)
 
 
@@ -251,8 +252,6 @@ def _validate_relations(
 def _validate_decks(
     decks: Any, section_ids: set[str], issues: list[ValidationIssue]
 ) -> None:
-    if decks is None:
-        return
     if not isinstance(decks, list):
         issues.append(ValidationIssue("decks-invalid", "decks", "expected a list"))
         return
