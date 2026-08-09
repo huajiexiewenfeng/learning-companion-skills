@@ -13,7 +13,9 @@ Allocation creates one direct child of `PLAN/lessons` named
 `YYYY-MM-DD-day-NNN-session-NN`. The directory reservation uses `mkdir()` as
 the collision check, so concurrent allocators cannot overwrite an earlier
 session. Every write, staging path, promotion target, and version target is
-resolved and proven to remain under that plan's `lessons` directory.
+resolved and proven to remain under its current session directory (not merely
+somewhere under the plan's `lessons` directory). Existing symlink parents are
+resolved before use and cannot redirect a write into another session.
 
 Allocation creates `lesson.md` in `preparing` state and an empty
 `artifacts.md` ledger. Add a valid `lesson-model.json` before preparing.
@@ -33,6 +35,11 @@ gate passes. A text or hybrid session becomes `studying`; a voice session
 becomes `awaiting-voice`. A failed prepare remains `preparing` and has no final
 artifact promotion.
 
+`prepare`, `sync`, `validate`, and `close` hold an exclusive per-session lock.
+They re-read the model, lifecycle state, and ledger only after acquiring that
+lock. This serializes concurrent callers, preventing lost records, orphaned
+versions, and incorrect `supersedes` links.
+
 The package minimum is:
 
 - one `index.html` hub;
@@ -50,6 +57,13 @@ lesson model's declared section sources or the `sources:` list in `lesson.md`.
 unchanged records are reused, changed immutable artifacts become `-v2`, `-v3`,
 and so on, and name the replaced record in `supersedes`. Hub and deck index
 navigation are mutable indexes and may update their original paths in place.
+Before reuse, the final file must exist, match the ledger SHA-256, and still
+pass its declared HTML profile; a tampered immutable artifact fails closed.
+
+Promotion preflights every version destination before final writes. The ledger,
+lifecycle files, and mutable indexes are snapshotted before commit. Any later
+write, collision, ledger, or status failure restores those snapshots and
+removes every newly created immutable artifact.
 
 `close` performs the final render with hub refresh disabled, sets both lesson
 metadata files to `closed`, and writes `.artifacts-frozen`. Frozen packages
@@ -58,11 +72,22 @@ module's write scope.
 
 ## Ledger and timestamps
 
-`artifacts.md` appends or preserves independently addressable card, deck, and
-slide records. Every record has `id`, `logicalId`, `path`, `type`, `title`,
+`artifacts.md` is a UTF-8 JSON document, not a Markdown parser surface:
+
+```json
+{"format":"learning-companion.artifact-ledger.v1","records":[...]}
+```
+
+Its root has exactly `format` and `records`. Each record is independently
+addressable and has `id`, `logicalId`, `path`, `type`, `title`,
 `profile`, `sourceTurn`, `sourceRefs`, `version`, `status`, `sha256`,
 `createdAt`, `updatedAt`, and `supersedes`. Artifact status remains `visual
 verification pending` until a separate browser review records otherwise.
+Record IDs, paths, and `(logicalId, version)` pairs must be unique; record
+types are checked and JSON arrays preserve source references (including
+newlines) without line-oriented record injection. Current validation computes
+the exact declared deck IDs, paths, and section-to-slide logical IDs from the
+model, so preserved historical deck records never satisfy a changed definition.
 
 Timestamps are deterministic: the default is `1970-01-01T00:00:00Z`; setting
 an integer `SOURCE_DATE_EPOCH` uses that UTC instant instead. This makes
@@ -78,5 +103,6 @@ lesson_package.py validate SESSION
 lesson_package.py close SESSION
 ```
 
-All commands emit UTF-8 JSON with `ensure_ascii=False`; exit status is zero
-only when the reported `overall` value is `passed`.
+All commands—including missing arguments and unknown subcommands—emit UTF-8
+JSON with `ensure_ascii=False`; exit status is zero only when the reported
+`overall` value is `passed`.

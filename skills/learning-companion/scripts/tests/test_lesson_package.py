@@ -1,26 +1,34 @@
 import copy
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 SCRIPT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPT_DIR))
 
 try:
+    import lesson_package
     from lesson_package import (
         allocate_session,
+        atomic_write_json,
         close_session,
         prepare_session,
+        session_context,
         sync_session,
         validate_session,
     )
-except ModuleNotFoundError:
-    allocate_session = close_session = prepare_session = sync_session = validate_session = None
+except (ModuleNotFoundError, ImportError):
+    lesson_package = None
+    allocate_session = atomic_write_json = close_session = prepare_session = None
+    session_context = sync_session = validate_session = None
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -66,7 +74,18 @@ class LessonPackageTest(unittest.TestCase):
         return session
 
     def ledger(self, session):
-        return (session / "artifacts.md").read_text(encoding="utf-8")
+        return json.loads((session / "artifacts.md").read_text(encoding="utf-8"))
+
+    def records(self, session):
+        return self.ledger(session)["records"]
+
+    @staticmethod
+    def snapshot(session):
+        return {
+            path.relative_to(session).as_posix(): path.read_bytes()
+            for path in session.rglob("*")
+            if path.is_file() and path.name != ".lesson-session.lock"
+        }
 
     def test_allocate_never_overwrites_history(self):
         first = self.allocate()
@@ -110,12 +129,13 @@ class LessonPackageTest(unittest.TestCase):
         self.assertTrue((session / "decks" / "002-diagnostic-evidence" / "index.html").is_file())
         self.assertGreaterEqual(len(list((session / "decks").glob("*/slides/*.html"))), 7)
         ledger = self.ledger(session)
-        self.assertIn("type: hub", ledger)
-        self.assertIn("type: deck", ledger)
-        self.assertIn("type: slide", ledger)
-        self.assertIn("profile: technical-visual", ledger)
-        self.assertIn("sha256:", ledger)
-        self.assertIn("createdAt: 1970-01-01T00:00:00Z", ledger)
+        self.assertEqual("learning-companion.artifact-ledger.v1", ledger["format"])
+        self.assertIn("hub", {record["type"] for record in ledger["records"]})
+        self.assertIn("deck", {record["type"] for record in ledger["records"]})
+        self.assertIn("slide", {record["type"] for record in ledger["records"]})
+        self.assertIn("technical-visual", {record["profile"] for record in ledger["records"]})
+        self.assertTrue(all(record["sha256"] for record in ledger["records"]))
+        self.assertTrue(all(record["createdAt"] == "1970-01-01T00:00:00Z" for record in ledger["records"]))
         self.assertEqual("studying", self.lesson_status(session))
 
     def test_voice_prepare_waits_for_voice_handoff(self):
@@ -152,16 +172,16 @@ class LessonPackageTest(unittest.TestCase):
         self.assertEqual("passed", report.overall, report.errors)
         self.assertTrue((session / "cards" / "core-concept.html").is_file())
         self.assertTrue((session / "cards" / "core-concept-v2.html").is_file())
-        self.assertIn("supersedes: core-concept", self.ledger(session))
+        current = next(record for record in self.records(session) if record["id"] == "core-concept-v2")
+        self.assertEqual("core-concept", current["supersedes"])
 
     def test_validation_rejects_unlisted_artifact_source_reference(self):
         session = self.valid_session()
         self.assertEqual("passed", prepare_session(session).overall)
         ledger_path = session / "artifacts.md"
-        ledger_path.write_text(
-            self.ledger(session).replace("sourceRefs: dashboard.md#Today", "sourceRefs: secret.md#Hidden", 1),
-            encoding="utf-8",
-        )
+        ledger = self.ledger(session)
+        ledger["records"][0]["sourceRefs"] = ["secret.md#Hidden"]
+        ledger_path.write_text(json.dumps(ledger, ensure_ascii=False), encoding="utf-8")
 
         report = validate_session(session)
 
@@ -203,6 +223,170 @@ class LessonPackageTest(unittest.TestCase):
         parsed = json.loads(result.stdout)
         self.assertEqual("passed", parsed["overall"])
         self.assertIn("企业 AI 系统分层", result.stdout)
+
+    def test_concurrent_same_changed_sync_serializes_one_v2_record(self):
+        session = self.valid_session()
+        self.assertEqual("passed", prepare_session(session).overall)
+        model_path = session / "lesson-model.json"
+        model = json.loads(model_path.read_text(encoding="utf-8"))
+        model["sections"][0]["summary"] = "并发修订后的概念"
+        model_path.write_text(json.dumps(model, ensure_ascii=False), encoding="utf-8")
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            reports = list(executor.map(lambda _: sync_session(session), range(2)))
+
+        self.assertTrue(all(report.overall == "passed" for report in reports))
+        core_records = [
+            record for record in self.records(session) if record["logicalId"] == "core-concept"
+        ]
+        self.assertEqual([1, 2], [record["version"] for record in core_records])
+        self.assertTrue((session / "cards" / "core-concept-v2.html").is_file())
+        self.assertFalse((session / "cards" / "core-concept-v3.html").exists())
+
+    def test_concurrent_unchanged_sync_reuses_one_stable_ledger(self):
+        session = self.valid_session()
+        self.assertEqual("passed", prepare_session(session).overall)
+        before = self.ledger(session)
+
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            reports = list(executor.map(lambda _: sync_session(session), range(3)))
+
+        self.assertTrue(all(report.overall == "passed" for report in reports))
+        self.assertEqual(before, self.ledger(session))
+
+    def test_failed_late_promotion_rolls_back_all_final_artifacts_and_state(self):
+        session = self.valid_session()
+        self.assertEqual("passed", prepare_session(session).overall)
+        before = self.snapshot(session)
+        model_path = session / "lesson-model.json"
+        model = json.loads(model_path.read_text(encoding="utf-8"))
+        model["sections"][0]["summary"] = "强制回滚的修订"
+        model_path.write_text(json.dumps(model, ensure_ascii=False), encoding="utf-8")
+        before["lesson-model.json"] = model_path.read_bytes()
+        original = lesson_package._write_new_bytes
+
+        def fail_on_slide(path, raw, context):
+            if "/slides/" in path.as_posix():
+                raise OSError("forced later immutable write failure")
+            return original(path, raw, context)
+
+        with patch.object(lesson_package, "_write_new_bytes", side_effect=fail_on_slide):
+            report = sync_session(session)
+
+        self.assertEqual("failed", report.overall)
+        self.assertEqual(before, self.snapshot(session))
+
+    def test_current_deck_manifest_rejects_stale_history_until_new_definition_syncs(self):
+        session = self.valid_session(decks=2)
+        self.assertEqual("passed", prepare_session(session).overall)
+        model_path = session / "lesson-model.json"
+        model = json.loads(model_path.read_text(encoding="utf-8"))
+        model["decks"] = [
+            {
+                "id": "revised-main",
+                "title": "修订主课件",
+                "sectionIds": ["runtime-flow"],
+            }
+        ]
+        model_path.write_text(json.dumps(model, ensure_ascii=False), encoding="utf-8")
+
+        stale = validate_session(session)
+        self.assertEqual("failed", stale.overall)
+        self.assertIn("current-deck-missing:deck-001-revised-main", stale.errors)
+        self.assertIn("current-slide-missing:slide-001-revised-main-001-runtime-flow", stale.errors)
+        self.assertEqual("passed", sync_session(session).overall)
+        self.assertEqual("passed", validate_session(session).overall)
+
+    def test_json_ledger_preserves_source_newlines_without_record_injection(self):
+        session = self.valid_session()
+        model_path = session / "lesson-model.json"
+        model = json.loads(model_path.read_text(encoding="utf-8"))
+        injected_source = "dashboard.md#Today\n- id: forged"
+        model["sections"][0]["sourceRefs"] = [injected_source]
+        model_path.write_text(json.dumps(model, ensure_ascii=False), encoding="utf-8")
+
+        self.assertEqual("passed", prepare_session(session).overall)
+        records = self.records(session)
+        self.assertTrue(any(injected_source in record["sourceRefs"] for record in records))
+        self.assertEqual("passed", validate_session(session).overall)
+
+    def test_validate_rejects_malformed_and_duplicate_json_ledger_records(self):
+        session = self.valid_session()
+        self.assertEqual("passed", prepare_session(session).overall)
+        ledger_path = session / "artifacts.md"
+        ledger_path.write_text("{not json}\n", encoding="utf-8")
+        malformed = validate_session(session)
+        self.assertEqual("failed", malformed.overall)
+        self.assertIn("artifact-ledger-malformed", malformed.errors)
+
+        session = self.valid_session()
+        self.assertEqual("passed", prepare_session(session).overall)
+        ledger = self.ledger(session)
+        duplicate = copy.deepcopy(ledger["records"][0])
+        ledger["records"].append(duplicate)
+        ledger_path = session / "artifacts.md"
+        ledger_path.write_text(json.dumps(ledger, ensure_ascii=False), encoding="utf-8")
+        duplicate_report = validate_session(session)
+        self.assertEqual("failed", duplicate_report.overall)
+        self.assertIn("artifact-ledger-duplicate-id:hub", duplicate_report.errors)
+
+    def test_sync_rejects_tampered_unchanged_immutable_artifact_before_reuse(self):
+        session = self.valid_session()
+        self.assertEqual("passed", prepare_session(session).overall)
+        card = session / "cards" / "core-concept.html"
+        card.write_text("tampered", encoding="utf-8")
+
+        report = sync_session(session)
+
+        self.assertEqual("failed", report.overall)
+        self.assertIn("immutable-artifact-tampered:core-concept", report.errors)
+        self.assertEqual("tampered", card.read_text(encoding="utf-8"))
+
+    def test_sync_rejects_deleted_unchanged_immutable_artifact_before_reuse(self):
+        session = self.valid_session()
+        self.assertEqual("passed", prepare_session(session).overall)
+        card = session / "cards" / "core-concept.html"
+        card.unlink()
+
+        report = sync_session(session)
+
+        self.assertEqual("failed", report.overall)
+        self.assertIn("immutable-artifact-tampered:core-concept", report.errors)
+        self.assertFalse(card.exists())
+
+    def test_write_helpers_require_session_context_and_reject_cross_session_symlink(self):
+        session = self.valid_session()
+        other = self.allocate()
+        context = session_context(session)
+        with self.assertRaises(ValueError):
+            atomic_write_json(self.plan, session / "untrusted.json", {"unsafe": True})
+        with self.assertRaises(ValueError):
+            atomic_write_json(context, other / "outside.json", {"unsafe": True})
+        if not hasattr(os, "symlink"):
+            self.skipTest("symlinks are unavailable")
+        escape = session / "escape"
+        try:
+            os.symlink(other, escape, target_is_directory=True)
+        except OSError as exc:
+            self.skipTest(f"symlink creation unavailable: {exc}")
+        with self.assertRaises(ValueError):
+            atomic_write_json(context, escape / "outside.json", {"unsafe": True})
+        self.assertFalse((other / "outside.json").exists())
+
+    def test_cli_argument_failures_emit_json(self):
+        for arguments in ([], ["not-a-command"], ["prepare"]):
+            with self.subTest(arguments=arguments):
+                result = subprocess.run(
+                    [str(PYTHON), str(SCRIPT_DIR / "lesson_package.py"), *arguments],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    check=False,
+                )
+                self.assertNotEqual(0, result.returncode)
+                parsed = json.loads(result.stdout)
+                self.assertEqual("failed", parsed["overall"])
+                self.assertTrue(parsed["errors"])
 
     @staticmethod
     def lesson_status(session):

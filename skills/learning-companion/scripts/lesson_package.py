@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timezone
 from html import escape
@@ -19,6 +20,7 @@ import re
 import shutil
 import sys
 import tempfile
+from threading import Lock
 from typing import Any, Iterable, Mapping
 from uuid import uuid4
 
@@ -65,6 +67,9 @@ LEDGER_FIELDS = (
     "updatedAt",
     "supersedes",
 )
+LEDGER_FORMAT = "learning-companion.artifact-ledger.v1"
+_LOCAL_LOCK_GUARD = Lock()
+_LOCAL_SESSION_LOCKS: dict[str, Lock] = {}
 
 
 @dataclass(frozen=True)
@@ -127,6 +132,77 @@ class LedgerRecord:
         }
 
 
+@dataclass(frozen=True)
+class SessionContext:
+    """Resolved, session-scoped authority for every lifecycle file mutation."""
+
+    session: Path
+    lessons_root: Path
+
+
+def session_context(session_dir: Path) -> SessionContext:
+    """Resolve and validate a direct lesson-session child before writes occur."""
+    session, lessons_root = _session_roots(Path(session_dir))
+    return SessionContext(session, lessons_root)
+
+
+def _safe_path(context: SessionContext, target: Path | str) -> Path:
+    if not isinstance(context, SessionContext):
+        raise ValueError("trusted session context required")
+    verified_session, verified_root = _session_roots(context.session)
+    if verified_session != context.session or verified_root != context.lessons_root:
+        raise ValueError("untrusted session context")
+    candidate = Path(target)
+    if not candidate.is_absolute():
+        candidate = context.session / candidate
+    resolved = candidate.resolve(strict=False)
+    try:
+        resolved.relative_to(context.session)
+    except ValueError as exc:
+        raise ValueError(f"path escapes current lesson session: {target}") from exc
+    return resolved
+
+
+@contextmanager
+def _session_lock(context: SessionContext):
+    """Serialize lifecycle mutations in-process and across cooperating processes."""
+    key = str(context.session)
+    with _LOCAL_LOCK_GUARD:
+        lock = _LOCAL_SESSION_LOCKS.setdefault(key, Lock())
+    lock.acquire()
+    descriptor: int | None = None
+    try:
+        lock_path = _safe_path(context, ".lesson-session.lock")
+        descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR)
+        if os.name == "nt":
+            import msvcrt
+
+            if os.fstat(descriptor).st_size == 0:
+                os.write(descriptor, b"0")
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            msvcrt.locking(descriptor, msvcrt.LK_LOCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(descriptor, fcntl.LOCK_EX)
+        yield
+    finally:
+        if descriptor is not None:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+
+                    os.lseek(descriptor, 0, os.SEEK_SET)
+                    msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(descriptor, fcntl.LOCK_UN)
+            finally:
+                os.close(descriptor)
+        lock.release()
+
+
 def assert_within(target: Path, root: Path) -> Path:
     """Resolve a target and prove it cannot escape its lesson root.
 
@@ -176,76 +252,76 @@ def allocate_session(
         except FileExistsError:
             sequence += 1
 
-    _write_lesson_skeleton(session_dir, plan_root.name, day, topic, mode, depth)
-    _atomic_write_text(assert_within(session_dir / LEDGER, lessons_root), _serialize_ledger(()), lessons_root)
+    context = session_context(session_dir)
+    _write_lesson_skeleton(context, plan_root.name, day, topic, mode, depth)
+    _atomic_write_text(context, LEDGER, _serialize_ledger(()))
     return session_dir
 
 
 def prepare_session(session_dir: Path) -> PackageReport:
     """Render a new lesson package, promoting it only after all gates pass."""
-    return _package_session(Path(session_dir), action="prepare")
+    try:
+        context = session_context(session_dir)
+        with _session_lock(context):
+            return _package_session(context, action="prepare")
+    except (OSError, ValueError) as exc:
+        return _failed("preparing", str(exc))
 
 
 def sync_session(session_dir: Path) -> PackageReport:
     """Refresh a mutable lesson index and append immutable changed artifacts."""
-    session = Path(session_dir)
     try:
-        session, lessons_root = _session_roots(session)
+        context = session_context(session_dir)
+        with _session_lock(context):
+            if _safe_path(context, FROZEN_MARKER).exists():
+                return _failed(_lesson_status(context), "artifacts-frozen")
+            return _package_session(context, action="sync")
     except ValueError as exc:
         return _failed("preparing", str(exc))
-    if assert_within(session / FROZEN_MARKER, lessons_root).exists():
-        return _failed(_lesson_status(session), "artifacts-frozen")
-    return _package_session(session, action="sync")
 
 
 def close_session(session_dir: Path) -> PackageReport:
     """Freeze a package and remove the hub refresh script without touching progress."""
-    session = Path(session_dir)
     try:
-        session, lessons_root = _session_roots(session)
+        context = session_context(session_dir)
+        with _session_lock(context):
+            if _safe_path(context, FROZEN_MARKER).exists():
+                return _validate_session(context)
+            return _package_session(context, action="close")
     except ValueError as exc:
         return _failed("preparing", str(exc))
-    marker = assert_within(session / FROZEN_MARKER, lessons_root)
-    if marker.exists():
-        return validate_session(session)
-
-    report = _package_session(session, action="close")
-    if report.overall != "passed":
-        return report
-    model_path = assert_within(session / "lesson-model.json", lessons_root)
-    model = load_lesson_model(model_path)
-    model["session"]["status"] = "closed"
-    atomic_write_json(model_path, model, lessons_root)
-    set_lesson_frontmatter_status(assert_within(session / "lesson.md", lessons_root), "closed", lessons_root)
-    _atomic_write_text(marker, "frozen\n", lessons_root)
-    return replace(report, status="closed")
 
 
 def validate_session(session_dir: Path) -> PackageReport:
     """Validate every ledger artifact, global term evidence, and source authority."""
     try:
-        session, lessons_root = _session_roots(Path(session_dir))
+        context = session_context(session_dir)
+        with _session_lock(context):
+            return _validate_session(context)
     except ValueError as exc:
         return _failed("preparing", str(exc))
-    status = _lesson_status(session)
-    if not assert_within(session / "lesson.md", lessons_root).is_file():
+
+
+def _validate_session(context: SessionContext) -> PackageReport:
+    status = _lesson_status(context)
+    if not _safe_path(context, "lesson.md").is_file():
         return _failed(status, "lesson-markdown-missing")
-    model, model_errors = _load_valid_model(session, lessons_root)
+    model, model_errors = _load_valid_model(context)
     if model_errors:
         return _failed(status, *model_errors)
-    records, ledger_errors = _read_ledger(assert_within(session / LEDGER, lessons_root))
+    records, ledger_errors = _read_ledger(context)
     errors = list(ledger_errors)
     if not records:
         errors.append("artifact-ledger-empty")
     errors.extend(_minimum_package_errors(records, model))
-    allowed_sources = _authorized_sources(session, model)
+    allowed_sources = _authorized_sources(context, model)
     artifact_text: list[str] = []
     for record in records:
         if record.profile not in PROFILES:
             errors.append(f"artifact-profile-invalid:{record.artifact_id}")
             continue
         try:
-            artifact_path = assert_within(session / record.relative_path, lessons_root)
+            artifact_path = _safe_path(context, record.relative_path)
         except ValueError:
             errors.append(f"artifact-path-escapes:{record.artifact_id}")
             continue
@@ -267,36 +343,26 @@ def validate_session(session_dir: Path) -> PackageReport:
     return _report("failed" if errors else "passed", status, errors, records, model)
 
 
-def atomic_write_json(path: Path, value: Mapping[str, Any], lessons_root: Path | None = None) -> None:
+def atomic_write_json(context: SessionContext, path: Path, value: Mapping[str, Any]) -> None:
     """Write deterministic UTF-8 JSON without exposing a partial model file."""
-    root = lessons_root or Path(path).parent
-    _atomic_write_text(
-        Path(path), json.dumps(value, ensure_ascii=False, indent=2) + "\n", Path(root)
-    )
+    _atomic_write_text(context, path, json.dumps(value, ensure_ascii=False, indent=2) + "\n")
 
 
-def set_lesson_frontmatter_status(
-    lesson_path: Path, status: str, lessons_root: Path | None = None
-) -> None:
+def set_lesson_frontmatter_status(context: SessionContext, lesson_path: Path, status: str) -> None:
     """Set only the lesson session status in its deliberately small front matter."""
-    root = lessons_root or Path(lesson_path).parent
-    target = assert_within(lesson_path, root)
+    target = _safe_path(context, lesson_path)
     text = target.read_text(encoding="utf-8")
     updated, count = re.subn(r"(?m)^status: .*$", f"status: {status}", text, count=1)
     if count != 1:
         raise ValueError("lesson.md is missing frontmatter status")
-    _atomic_write_text(target, updated, Path(root))
+    _atomic_write_text(context, target, updated)
 
 
-def _package_session(session_dir: Path, action: str) -> PackageReport:
-    try:
-        session, lessons_root = _session_roots(session_dir)
-    except ValueError as exc:
-        return _failed("preparing", str(exc))
-    prior_status = _lesson_status(session)
-    if not assert_within(session / "lesson.md", lessons_root).is_file():
+def _package_session(context: SessionContext, action: str) -> PackageReport:
+    prior_status = _lesson_status(context)
+    if not _safe_path(context, "lesson.md").is_file():
         return _failed(prior_status, "lesson-markdown-missing")
-    model, model_errors = _load_valid_model(session, lessons_root)
+    model, model_errors = _load_valid_model(context)
     if model_errors:
         return _failed(prior_status, *model_errors)
     if action == "prepare" and prior_status != "preparing":
@@ -304,30 +370,28 @@ def _package_session(session_dir: Path, action: str) -> PackageReport:
     if action not in {"prepare", "sync", "close"}:
         return _failed(prior_status, f"unknown-package-action:{action}")
 
-    records, ledger_errors = _read_ledger(assert_within(session / LEDGER, lessons_root))
+    records, ledger_errors = _read_ledger(context)
     if ledger_errors:
         return _failed(prior_status, *ledger_errors)
     desired_status = "closed" if action == "close" else _active_status(model)
     refresh = action != "close"
-    stage = assert_within(session / f".lesson-stage-{uuid4().hex}", lessons_root)
+    stage = _safe_path(context, f".lesson-stage-{uuid4().hex}")
     try:
         stage.mkdir()
         specs, build_errors = _build_artifacts(model, refresh)
         if build_errors:
             return _failed(prior_status, *build_errors)
-        staged = _write_and_validate_stage(stage, specs, lessons_root)
-        gate_errors = _package_gate_errors(model, specs, staged, session)
+        staged = _write_and_validate_stage(context, stage, specs)
+        gate_errors = _package_gate_errors(context, model, specs, staged)
         if gate_errors:
             return _failed(prior_status, *gate_errors)
-        promoted = _promote_artifacts(session, lessons_root, specs, staged, records)
-        _atomic_write_text(
-            assert_within(session / LEDGER, lessons_root), _serialize_ledger(promoted), lessons_root
-        )
-        if action != "close":
-            _write_lifecycle_status(session, lessons_root, model, desired_status)
+        promoted = _commit_package(context, specs, staged, records, model, desired_status, action)
         return _report("passed", desired_status, (), promoted, model)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
-        return _failed(prior_status, f"package-error:{exc}")
+        message = str(exc)
+        if message.startswith(("immutable-artifact-tampered:", "index-artifact-tampered:", "version-target-collision:")):
+            return _failed(prior_status, message)
+        return _failed(prior_status, f"package-error:{message}")
     finally:
         if stage.exists():
             # Stage contents are never evidence or history.  It is safe to
@@ -360,12 +424,11 @@ def _next_session_number(lessons_root: Path, prefix: str) -> int:
 
 
 def _write_lesson_skeleton(
-    session: Path, plan_id: str, day: int, topic: str, mode: str, depth: str
+    context: SessionContext, plan_id: str, day: int, topic: str, mode: str, depth: str
 ) -> None:
-    lessons_root = session.parent
     lesson = (
         "---\n"
-        f"id: {session.name}\n"
+        f"id: {context.session.name}\n"
         f"planId: {plan_id}\n"
         f"day: {day}\n"
         f"topic: {json.dumps(topic, ensure_ascii=False)}\n"
@@ -376,11 +439,11 @@ def _write_lesson_skeleton(
         "---\n\n"
         f"# {topic}\n"
     )
-    _atomic_write_text(assert_within(session / "lesson.md", lessons_root), lesson, lessons_root)
+    _atomic_write_text(context, "lesson.md", lesson)
 
 
-def _load_valid_model(session: Path, lessons_root: Path) -> tuple[dict[str, Any], tuple[str, ...]]:
-    model_path = assert_within(session / "lesson-model.json", lessons_root)
+def _load_valid_model(context: SessionContext) -> tuple[dict[str, Any], tuple[str, ...]]:
+    model_path = _safe_path(context, "lesson-model.json")
     if not model_path.is_file():
         return {}, ("lesson-model-missing",)
     try:
@@ -494,13 +557,13 @@ def _artifact_spec(
 
 
 def _write_and_validate_stage(
-    stage: Path, specs: Iterable[ArtifactSpec], lessons_root: Path
+    context: SessionContext, stage: Path, specs: Iterable[ArtifactSpec]
 ) -> dict[str, Path]:
     staged: dict[str, Path] = {}
     for spec in specs:
-        target = assert_within(stage / spec.relative_path, lessons_root)
+        target = _safe_path(context, stage / spec.relative_path)
         target.parent.mkdir(parents=True, exist_ok=True)
-        _atomic_write_text(target, spec.html, lessons_root)
+        _atomic_write_text(context, target, spec.html)
         validation = validate_html(target, spec.required_terms, spec.profile)
         if validation["overall"] != "passed":
             rendered = ",".join(validation["errors"])
@@ -510,14 +573,14 @@ def _write_and_validate_stage(
 
 
 def _package_gate_errors(
+    context: SessionContext,
     model: Mapping[str, Any],
     specs: tuple[ArtifactSpec, ...],
     staged: Mapping[str, Path],
-    session: Path,
 ) -> tuple[str, ...]:
     errors = list(_minimum_package_errors_from_specs(specs, model))
     errors.extend(_global_term_errors(model, [path.read_text(encoding="utf-8") for path in staged.values()]))
-    allowed_sources = _authorized_sources(session, model)
+    allowed_sources = _authorized_sources(context, model)
     for spec in specs:
         for source_ref in spec.source_refs:
             if source_ref not in allowed_sources:
@@ -550,21 +613,30 @@ def _minimum_package_errors_from_specs(
 
 
 def _minimum_package_errors(records: Iterable[LedgerRecord], model: Mapping[str, Any]) -> tuple[str, ...]:
-    record_specs = tuple(
-        ArtifactSpec(
-            logical_id=record.logical_id,
-            title=record.title,
-            artifact_type=record.artifact_type,
-            profile=record.profile,
-            relative_path=record.relative_path,
-            html="",
-            source_refs=record.source_refs,
-            required_terms=(),
-            mutable_index=record.artifact_type in {"hub", "deck"},
+    history = tuple(records)
+    expected, build_errors = _build_artifacts(model, refresh=True)
+    if build_errors:
+        return build_errors
+    errors = list(_minimum_package_errors_from_specs(expected, model))
+    for spec in expected:
+        matches = [
+            record for record in history
+            if record.logical_id == spec.logical_id and record.artifact_type == spec.artifact_type
+        ]
+        if not matches:
+            errors.append(f"current-{spec.artifact_type}-missing:{spec.logical_id}")
+            continue
+        current = max(matches, key=lambda record: record.version)
+        expected_path = (
+            spec.relative_path
+            if spec.mutable_index
+            else _versioned_path(spec.relative_path, current.version)
         )
-        for record in records
-    )
-    return _minimum_package_errors_from_specs(record_specs, model)
+        if current.relative_path != expected_path:
+            errors.append(f"current-{spec.artifact_type}-path-mismatch:{spec.logical_id}")
+        if current.profile != spec.profile:
+            errors.append(f"current-{spec.artifact_type}-profile-mismatch:{spec.logical_id}")
+    return tuple(dict.fromkeys(errors))
 
 
 def _global_term_errors(model: Mapping[str, Any], texts: Iterable[str]) -> tuple[str, ...]:
@@ -576,14 +648,14 @@ def _global_term_errors(model: Mapping[str, Any], texts: Iterable[str]) -> tuple
     )
 
 
-def _authorized_sources(session: Path, model: Mapping[str, Any]) -> frozenset[str]:
+def _authorized_sources(context: SessionContext, model: Mapping[str, Any]) -> frozenset[str]:
     model_sources = {
         source
         for section in model["sections"]
         for source in section.get("sourceRefs", ())
         if isinstance(source, str)
     }
-    return frozenset(model_sources | set(_lesson_sources(session / "lesson.md")))
+    return frozenset(model_sources | set(_lesson_sources(_safe_path(context, "lesson.md"))))
 
 
 def _lesson_sources(lesson_path: Path) -> tuple[str, ...]:
@@ -605,26 +677,31 @@ def _lesson_sources(lesson_path: Path) -> tuple[str, ...]:
     return tuple(sources)
 
 
-def _promote_artifacts(
-    session: Path,
-    lessons_root: Path,
+def _commit_package(
+    context: SessionContext,
     specs: tuple[ArtifactSpec, ...],
     staged: Mapping[str, Path],
     existing: tuple[LedgerRecord, ...],
+    model: Mapping[str, Any],
+    desired_status: str,
+    action: str,
 ) -> tuple[LedgerRecord, ...]:
+    """Preflight and commit a package as one rollback-capable transaction."""
     records = list(existing)
     timestamp = _deterministic_timestamp()
+    writes: list[tuple[bool, Path, bytes]] = []
     for spec in specs:
         raw = staged[spec.logical_id].read_bytes()
         digest = _sha256(raw)
         matches = [record for record in records if record.logical_id == spec.logical_id]
         same = next((record for record in matches if record.sha256 == digest), None)
         if same is not None:
+            _verify_reusable_artifact(context, spec, same)
             continue
         if spec.mutable_index:
             current = max(matches, key=lambda record: record.version, default=None)
-            target = assert_within(session / spec.relative_path, lessons_root)
-            _atomic_write_bytes(target, raw, lessons_root)
+            target = _safe_path(context, spec.relative_path)
+            writes.append((True, target, raw))
             replacement = _new_record(
                 spec,
                 artifact_id=current.artifact_id if current else spec.logical_id,
@@ -642,15 +719,12 @@ def _promote_artifacts(
             continue
 
         next_version = max((record.version for record in matches), default=0) + 1
-        while True:
-            artifact_id = spec.logical_id if next_version == 1 else f"{spec.logical_id}-v{next_version}"
-            relative_path = _versioned_path(spec.relative_path, next_version)
-            target = assert_within(session / relative_path, lessons_root)
-            try:
-                _write_new_bytes(target, raw, lessons_root)
-                break
-            except FileExistsError:
-                next_version += 1
+        artifact_id = spec.logical_id if next_version == 1 else f"{spec.logical_id}-v{next_version}"
+        relative_path = _versioned_path(spec.relative_path, next_version)
+        target = _safe_path(context, relative_path)
+        if target.exists():
+            raise ValueError(f"version-target-collision:{relative_path}")
+        writes.append((False, target, raw))
         previous = max(matches, key=lambda record: record.version, default=None)
         records.append(
             _new_record(
@@ -664,7 +738,71 @@ def _promote_artifacts(
                 updated_at=timestamp,
             )
         )
+    protected = [
+        _safe_path(context, LEDGER),
+        _safe_path(context, "lesson-model.json"),
+        _safe_path(context, "lesson.md"),
+        _safe_path(context, FROZEN_MARKER),
+    ]
+    for mutable, target, _ in writes:
+        _preflight_destination(context, target, mutable)
+    for target in protected:
+        _preflight_destination(context, target, mutable=True)
+    snapshots = {
+        path: path.read_bytes() if path.exists() else None
+        for path in protected + [target for mutable, target, _ in writes if mutable]
+    }
+    created: list[Path] = []
+    immutable_targets = [target for mutable, target, _ in writes if not mutable]
+    try:
+        for mutable, target, raw in writes:
+            if mutable:
+                _atomic_write_bytes(context, target, raw)
+            else:
+                _write_new_bytes(target, raw, context)
+                created.append(target)
+        _atomic_write_text(context, LEDGER, _serialize_ledger(records))
+        _write_lifecycle_status(context, model, desired_status)
+        if action == "close":
+            _atomic_write_text(context, FROZEN_MARKER, "frozen\n")
+    except Exception:
+        for target in reversed(tuple(dict.fromkeys(created + immutable_targets))):
+            if target.exists():
+                target.unlink()
+        for target, original in snapshots.items():
+            if original is None:
+                if target.exists():
+                    target.unlink()
+            else:
+                _atomic_write_bytes(context, target, original)
+        raise
     return tuple(records)
+
+
+def _preflight_destination(context: SessionContext, target: Path, mutable: bool) -> None:
+    """Reject collisions and invalid parents before any final write begins."""
+    safe_target = _safe_path(context, target)
+    parent = safe_target.parent
+    while not parent.exists():
+        parent = parent.parent
+    if not parent.is_dir():
+        raise ValueError(f"destination-parent-invalid:{safe_target}")
+    if not mutable and safe_target.exists():
+        relative = safe_target.relative_to(context.session).as_posix()
+        raise ValueError(f"version-target-collision:{relative}")
+
+
+def _verify_reusable_artifact(
+    context: SessionContext, spec: ArtifactSpec, record: LedgerRecord
+) -> None:
+    target = _safe_path(context, record.relative_path)
+    valid = target.is_file() and _sha256(target.read_bytes()) == record.sha256
+    if valid:
+        validation = validate_html(target, spec.required_terms, record.profile)
+        valid = validation["overall"] == "passed" and record.profile == spec.profile
+    if not valid:
+        prefix = "immutable-artifact-tampered" if not spec.mutable_index else "index-artifact-tampered"
+        raise ValueError(f"{prefix}:{spec.logical_id}")
 
 
 def _new_record(
@@ -703,66 +841,83 @@ def _versioned_path(relative_path: str, version: int) -> str:
 
 
 def _write_lifecycle_status(
-    session: Path, lessons_root: Path, model: Mapping[str, Any], status: str
+    context: SessionContext, model: Mapping[str, Any], status: str
 ) -> None:
     mutable_model = copy.deepcopy(model)
     mutable_model["session"]["status"] = status
-    atomic_write_json(assert_within(session / "lesson-model.json", lessons_root), mutable_model, lessons_root)
-    set_lesson_frontmatter_status(assert_within(session / "lesson.md", lessons_root), status, lessons_root)
+    atomic_write_json(context, Path("lesson-model.json"), mutable_model)
+    set_lesson_frontmatter_status(context, Path("lesson.md"), status)
 
 
-def _read_ledger(path: Path) -> tuple[tuple[LedgerRecord, ...], tuple[str, ...]]:
+def _read_ledger(context: SessionContext) -> tuple[tuple[LedgerRecord, ...], tuple[str, ...]]:
+    path = _safe_path(context, LEDGER)
     if not path.is_file():
         return (), ("artifact-ledger-missing",)
-    blocks: list[dict[str, str]] = []
-    current: dict[str, str] | None = None
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if line.startswith("- id: "):
-            if current is not None:
-                blocks.append(current)
-            current = {"id": line.removeprefix("- id: ")}
-        elif current is not None and line.startswith("  ") and ":" in line:
-            key, value = line.strip().split(":", 1)
-            current[key] = value.lstrip()
-    if current is not None:
-        blocks.append(current)
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return (), ("artifact-ledger-malformed",)
+    if (
+        not isinstance(document, dict)
+        or set(document) != {"format", "records"}
+        or document.get("format") != LEDGER_FORMAT
+        or not isinstance(document.get("records"), list)
+    ):
+        return (), ("artifact-ledger-format-invalid",)
     errors: list[str] = []
     records: list[LedgerRecord] = []
-    for index, block in enumerate(blocks):
-        missing = [field for field in LEDGER_FIELDS if field not in block]
-        if missing:
-            errors.append(f"artifact-ledger-fields-missing:{index}:{','.join(missing)}")
+    ids: set[str] = set()
+    paths: set[str] = set()
+    logical_versions: set[tuple[str, int]] = set()
+    for index, block in enumerate(document["records"]):
+        if not isinstance(block, dict) or set(block) != set(LEDGER_FIELDS):
+            errors.append(f"artifact-ledger-record-invalid:{index}")
             continue
         try:
-            records.append(
-                LedgerRecord(
-                    artifact_id=block["id"],
-                    logical_id=block["logicalId"],
-                    relative_path=block["path"],
-                    artifact_type=block["type"],
-                    title=block["title"],
-                    profile=block["profile"],
-                    source_turn=block["sourceTurn"],
-                    source_refs=tuple(
-                        item for item in block["sourceRefs"].split(" | ") if item
-                    ),
-                    version=int(block["version"]),
-                    status=block["status"],
-                    sha256=block["sha256"],
-                    created_at=block["createdAt"],
-                    updated_at=block["updatedAt"],
-                    supersedes=block["supersedes"],
-                )
+            string_fields = (
+                "id", "logicalId", "path", "type", "title", "profile", "sourceTurn",
+                "status", "sha256", "createdAt", "updatedAt", "supersedes",
             )
-        except ValueError:
+            if (
+                any(not isinstance(block[field], str) for field in string_fields)
+                or not isinstance(block["sourceRefs"], list)
+                or not all(isinstance(source, str) for source in block["sourceRefs"])
+                or not isinstance(block["version"], int)
+                or isinstance(block["version"], bool)
+                or block["version"] < 1
+            ):
+                raise ValueError
+            record = LedgerRecord(
+                artifact_id=block["id"], logical_id=block["logicalId"],
+                relative_path=block["path"], artifact_type=block["type"],
+                title=block["title"], profile=block["profile"], source_turn=block["sourceTurn"],
+                source_refs=tuple(block["sourceRefs"]), version=block["version"],
+                status=block["status"], sha256=block["sha256"],
+                created_at=block["createdAt"], updated_at=block["updatedAt"],
+                supersedes=block["supersedes"],
+            )
+            _safe_path(context, record.relative_path)
+        except (ValueError, TypeError):
             errors.append(f"artifact-ledger-invalid:{index}")
+            continue
+        if record.artifact_id in ids:
+            errors.append(f"artifact-ledger-duplicate-id:{record.artifact_id}")
+        if record.relative_path in paths:
+            errors.append(f"artifact-ledger-duplicate-path:{record.relative_path}")
+        key = (record.logical_id, record.version)
+        if key in logical_versions:
+            errors.append(f"artifact-ledger-duplicate-version:{record.logical_id}:{record.version}")
+        ids.add(record.artifact_id)
+        paths.add(record.relative_path)
+        logical_versions.add(key)
+        records.append(record)
     return tuple(records), tuple(errors)
 
 
 def _serialize_ledger(records: Iterable[LedgerRecord]) -> str:
-    lines = ["# Lesson artifact ledger", ""]
+    document = {"format": LEDGER_FORMAT, "records": []}
     for record in records:
-        values = {
+        document["records"].append({
             "id": record.artifact_id,
             "logicalId": record.logical_id,
             "path": record.relative_path,
@@ -770,18 +925,15 @@ def _serialize_ledger(records: Iterable[LedgerRecord]) -> str:
             "title": record.title,
             "profile": record.profile,
             "sourceTurn": record.source_turn,
-            "sourceRefs": " | ".join(record.source_refs),
-            "version": str(record.version),
+            "sourceRefs": list(record.source_refs),
+            "version": record.version,
             "status": record.status,
             "sha256": record.sha256,
             "createdAt": record.created_at,
             "updatedAt": record.updated_at,
             "supersedes": record.supersedes,
-        }
-        lines.append(f"- id: {values['id']}")
-        lines.extend(f"  {field}: {values[field]}" for field in LEDGER_FIELDS if field != "id")
-        lines.append("")
-    return "\n".join(lines)
+        })
+    return json.dumps(document, ensure_ascii=False, indent=2) + "\n"
 
 
 def _deterministic_timestamp() -> str:
@@ -805,20 +957,20 @@ def _unique_sources(sources: Iterable[str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(source for source in sources if isinstance(source, str)))
 
 
-def _write_new_bytes(path: Path, raw: bytes, lessons_root: Path) -> None:
-    target = assert_within(path, lessons_root)
+def _write_new_bytes(path: Path, raw: bytes, context: SessionContext) -> None:
+    target = _safe_path(context, path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    assert_within(target.parent, lessons_root)
+    _safe_path(context, target.parent)
     with target.open("xb") as output:
         output.write(raw)
 
 
-def _atomic_write_bytes(path: Path, raw: bytes, lessons_root: Path) -> None:
-    target = assert_within(path, lessons_root)
+def _atomic_write_bytes(context: SessionContext, path: Path | str, raw: bytes) -> None:
+    target = _safe_path(context, path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    assert_within(target.parent, lessons_root)
+    _safe_path(context, target.parent)
     handle, temporary_name = tempfile.mkstemp(prefix=".lesson-write-", dir=target.parent)
-    temporary = assert_within(Path(temporary_name), lessons_root)
+    temporary = _safe_path(context, Path(temporary_name))
     try:
         with os.fdopen(handle, "wb") as output:
             output.write(raw)
@@ -828,12 +980,12 @@ def _atomic_write_bytes(path: Path, raw: bytes, lessons_root: Path) -> None:
             temporary.unlink()
 
 
-def _atomic_write_text(path: Path, text: str, lessons_root: Path) -> None:
-    _atomic_write_bytes(path, text.encode("utf-8"), lessons_root)
+def _atomic_write_text(context: SessionContext, path: Path | str, text: str) -> None:
+    _atomic_write_bytes(context, path, text.encode("utf-8"))
 
 
-def _lesson_status(session: Path) -> str:
-    lesson = session / "lesson.md"
+def _lesson_status(context: SessionContext) -> str:
+    lesson = _safe_path(context, "lesson.md")
     if not lesson.is_file():
         return "preparing"
     match = re.search(r"(?m)^status: (.+)$", lesson.read_text(encoding="utf-8"))
@@ -871,8 +1023,13 @@ def _configure_utf8_stdout() -> None:
         pass
 
 
+class _JsonArgumentParser(argparse.ArgumentParser):
+    def error(self, message: str) -> None:
+        raise ValueError(f"argument-error:{message}")
+
+
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Manage offline learning-companion lesson packages.")
+    parser = _JsonArgumentParser(description="Manage offline learning-companion lesson packages.")
     commands = parser.add_subparsers(dest="command", required=True)
     allocate = commands.add_parser("allocate")
     allocate.add_argument("plan_dir", type=Path)
@@ -889,8 +1046,8 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     _configure_utf8_stdout()
-    args = _parser().parse_args(argv)
     try:
+        args = _parser().parse_args(argv)
         if args.command == "allocate":
             session = allocate_session(
                 args.plan_dir, args.day, args.topic, args.mode, args.depth, args.date
