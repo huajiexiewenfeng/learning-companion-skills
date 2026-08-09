@@ -175,6 +175,25 @@ class LessonPackageTest(unittest.TestCase):
         current = next(record for record in self.records(session) if record["id"] == "core-concept-v2")
         self.assertEqual("core-concept", current["supersedes"])
 
+    def test_reverting_to_historical_bytes_creates_v3_from_active_version(self):
+        session = self.valid_session()
+        self.assertEqual("passed", prepare_session(session).overall)
+        model_path = session / "lesson-model.json"
+        model = json.loads(model_path.read_text(encoding="utf-8"))
+        original_summary = model["sections"][0]["summary"]
+        model["sections"][0]["summary"] = "第一次修订"
+        model_path.write_text(json.dumps(model, ensure_ascii=False), encoding="utf-8")
+        self.assertEqual("passed", sync_session(session).overall)
+        model["sections"][0]["summary"] = original_summary
+        model_path.write_text(json.dumps(model, ensure_ascii=False), encoding="utf-8")
+
+        report = sync_session(session)
+
+        self.assertEqual("passed", report.overall, report.errors)
+        self.assertTrue((session / "cards" / "core-concept-v3.html").is_file())
+        current = next(record for record in self.records(session) if record["id"] == "core-concept-v3")
+        self.assertEqual("core-concept-v2", current["supersedes"])
+
     def test_validation_rejects_unlisted_artifact_source_reference(self):
         session = self.valid_session()
         self.assertEqual("passed", prepare_session(session).overall)
@@ -276,6 +295,29 @@ class LessonPackageTest(unittest.TestCase):
         self.assertEqual("failed", report.overall)
         self.assertEqual(before, self.snapshot(session))
 
+    def test_rollback_preserves_foreign_collision_created_after_preflight(self):
+        session = self.valid_session()
+        self.assertEqual("passed", prepare_session(session).overall)
+        model_path = session / "lesson-model.json"
+        model = json.loads(model_path.read_text(encoding="utf-8"))
+        model["sections"][0]["summary"] = "并发外部碰撞"
+        model_path.write_text(json.dumps(model, ensure_ascii=False), encoding="utf-8")
+        foreign = session / "cards" / "core-concept-v2.html"
+        original = lesson_package._write_new_bytes
+
+        def create_foreign_then_collide(path, raw, context):
+            if path == foreign:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"foreign actor bytes")
+                raise FileExistsError("foreign actor won exclusive creation")
+            return original(path, raw, context)
+
+        with patch.object(lesson_package, "_write_new_bytes", side_effect=create_foreign_then_collide):
+            report = sync_session(session)
+
+        self.assertEqual("failed", report.overall)
+        self.assertEqual(b"foreign actor bytes", foreign.read_bytes())
+
     def test_current_deck_manifest_rejects_stale_history_until_new_definition_syncs(self):
         session = self.valid_session(decks=2)
         self.assertEqual("passed", prepare_session(session).overall)
@@ -329,6 +371,19 @@ class LessonPackageTest(unittest.TestCase):
         duplicate_report = validate_session(session)
         self.assertEqual("failed", duplicate_report.overall)
         self.assertIn("artifact-ledger-duplicate-id:hub", duplicate_report.errors)
+
+    def test_validate_rejects_unknown_ledger_artifact_type(self):
+        session = self.valid_session()
+        self.assertEqual("passed", prepare_session(session).overall)
+        ledger_path = session / "artifacts.md"
+        ledger = self.ledger(session)
+        ledger["records"][0]["type"] = "unsafe-type"
+        ledger_path.write_text(json.dumps(ledger, ensure_ascii=False), encoding="utf-8")
+
+        report = validate_session(session)
+
+        self.assertEqual("failed", report.overall)
+        self.assertIn("artifact-ledger-type-invalid:0", report.errors)
 
     def test_sync_rejects_tampered_unchanged_immutable_artifact_before_reuse(self):
         session = self.valid_session()

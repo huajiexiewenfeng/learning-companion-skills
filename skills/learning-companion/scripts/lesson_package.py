@@ -68,6 +68,7 @@ LEDGER_FIELDS = (
     "supersedes",
 )
 LEDGER_FORMAT = "learning-companion.artifact-ledger.v1"
+ARTIFACT_TYPES = frozenset({"hub", "card", "deck", "slide"})
 _LOCAL_LOCK_GUARD = Lock()
 _LOCAL_SESSION_LOCKS: dict[str, Lock] = {}
 
@@ -694,9 +695,9 @@ def _commit_package(
         raw = staged[spec.logical_id].read_bytes()
         digest = _sha256(raw)
         matches = [record for record in records if record.logical_id == spec.logical_id]
-        same = next((record for record in matches if record.sha256 == digest), None)
-        if same is not None:
-            _verify_reusable_artifact(context, spec, same)
+        active = max(matches, key=lambda record: record.version, default=None)
+        if active is not None and active.sha256 == digest:
+            _verify_reusable_artifact(context, spec, active)
             continue
         if spec.mutable_index:
             current = max(matches, key=lambda record: record.version, default=None)
@@ -752,22 +753,21 @@ def _commit_package(
         path: path.read_bytes() if path.exists() else None
         for path in protected + [target for mutable, target, _ in writes if mutable]
     }
-    created: list[Path] = []
-    immutable_targets = [target for mutable, target, _ in writes if not mutable]
+    created: list[tuple[Path, str]] = []
     try:
         for mutable, target, raw in writes:
             if mutable:
                 _atomic_write_bytes(context, target, raw)
             else:
                 _write_new_bytes(target, raw, context)
-                created.append(target)
+                created.append((target, _sha256(raw)))
         _atomic_write_text(context, LEDGER, _serialize_ledger(records))
         _write_lifecycle_status(context, model, desired_status)
         if action == "close":
             _atomic_write_text(context, FROZEN_MARKER, "frozen\n")
     except Exception:
-        for target in reversed(tuple(dict.fromkeys(created + immutable_targets))):
-            if target.exists():
+        for target, owned_hash in reversed(created):
+            if target.is_file() and _sha256(target.read_bytes()) == owned_hash:
                 target.unlink()
         for target, original in snapshots.items():
             if original is None:
@@ -887,6 +887,9 @@ def _read_ledger(context: SessionContext) -> tuple[tuple[LedgerRecord, ...], tup
                 or block["version"] < 1
             ):
                 raise ValueError
+            if block["type"] not in ARTIFACT_TYPES:
+                errors.append(f"artifact-ledger-type-invalid:{index}")
+                continue
             record = LedgerRecord(
                 artifact_id=block["id"], logical_id=block["logicalId"],
                 relative_path=block["path"], artifact_type=block["type"],

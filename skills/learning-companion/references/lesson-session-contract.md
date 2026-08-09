@@ -88,6 +88,8 @@ types are checked and JSON arrays preserve source references (including
 newlines) without line-oriented record injection. Current validation computes
 the exact declared deck IDs, paths, and section-to-slide logical IDs from the
 model, so preserved historical deck records never satisfy a changed definition.
+The only valid record types are `hub`, `card`, `deck`, and `slide`; unknown
+types are a malformed ledger, never an extensibility fallback.
 
 Timestamps are deterministic: the default is `1970-01-01T00:00:00Z`; setting
 an integer `SOURCE_DATE_EPOCH` uses that UTC instant instead. This makes
