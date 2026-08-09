@@ -280,6 +280,27 @@ class RenderLessonTest(unittest.TestCase):
                 sum(node["group"] == group for node in boundary["nodes"]),
                 mobile.count(f'<span class="mobile-flow-group">{group}</span>'),
             )
+        group_bounds = {
+            label: tuple(map(int, (left, top, width, height)))
+            for left, top, width, height, label in re.findall(
+                r'<g class="diagram-boundary-group"><rect class="diagram-boundary" '
+                r'x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)" rx="20"></rect>'
+                r'<text class="diagram-boundary-label" x="\d+" y="72">([^<]+)</text></g>',
+                html,
+            )
+        }
+        for node_index, node in enumerate(boundary["nodes"]):
+            left, top, width, height = group_bounds[node["group"]]
+            position = re.search(
+                rf'data-node-id="node-{node_index}" transform="translate\((\d+) (\d+)\)"',
+                html,
+            )
+            self.assertIsNotNone(position)
+            node_left, node_top = map(int, position.groups())
+            self.assertGreaterEqual(node_left, left)
+            self.assertGreaterEqual(node_top, top)
+            self.assertLessEqual(node_left + 200, left + width)
+            self.assertLessEqual(node_top + 96, top + height)
 
         changed_kinds = copy.deepcopy(boundary)
         for node in changed_kinds["nodes"]:
