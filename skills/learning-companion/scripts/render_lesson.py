@@ -10,6 +10,7 @@ from string import Template
 from typing import Any, Callable, Mapping
 
 from lesson_model import RELATIONAL_TYPES, slugify
+from validate_lesson_html import HUB_ACTIVE_STATUSES, HUB_REFRESH_BODY
 
 
 TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
@@ -461,53 +462,126 @@ def render_deck(
     )
 
 
-def render_hub(
-    model: Mapping[str, Any],
-    decks: tuple[Mapping[str, Any], ...],
-    theme_css: str,
-    refresh: bool,
-) -> RenderedArtifact:
-    """Render the session hub with only allow-listed offline hub scripts."""
-    deck_items = "".join(
-        f'<li><a href="#deck-{slugify(str(deck["id"]))}">{_text(deck["title"])}</a></li>'
-        for deck in decks
+HUB_CARD_TYPES = frozenset({"conclusion", "explanation", "case", "misconception", "visual", "check", "answer", "correction", "deck"})
+
+
+def _contained_artifact_path(value: object) -> str:
+    """Return one stable local artifact path or reject it before rendering."""
+    if not isinstance(value, str) or not value or "\\" in value:
+        raise ValueError("contained artifact path required")
+    parts = value.split("/")
+    if (
+        len(parts) < 2
+        or parts[0] not in {"cards", "decks", "visuals"}
+        or any(not part or part in {".", ".."} for part in parts)
+        or not value.endswith(".html")
+        or not all(part.replace("-", "").replace("_", "").replace(".", "").isalnum() for part in parts)
+    ):
+        raise ValueError("contained artifact path required")
+    return value
+
+
+def _safe_json(value: object) -> str:
+    """Embed deterministic data without allowing an HTML script breakout."""
+    return json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":")).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026")
+
+
+def _artifact_type(value: object) -> str:
+    return value if isinstance(value, str) and value in HUB_CARD_TYPES else "artifact"
+
+
+def _hub_artifacts(artifacts: tuple[Mapping[str, Any], ...]) -> tuple[dict[str, object], ...]:
+    records: list[dict[str, object]] = []
+    for index, artifact in enumerate(artifacts, start=1):
+        if not isinstance(artifact, Mapping):
+            raise ValueError("hub artifacts must be mappings")
+        path = _contained_artifact_path(artifact.get("path", artifact.get("relative_path")))
+        order = artifact.get("order", index)
+        if not isinstance(order, int):
+            order = index
+        count = artifact.get("count", artifact.get("slideCount", 1))
+        if not isinstance(count, int) or count < 0:
+            raise ValueError("hub artifact count must be a non-negative integer")
+        records.append({
+            "id": str(artifact.get("id", path)),
+            "type": _artifact_type(artifact.get("type")),
+            "title": str(artifact.get("title", path)),
+            "summary": str(artifact.get("summary", "")),
+            "path": path,
+            "order": order,
+            "count": count,
+        })
+    return tuple(sorted(records, key=lambda item: (int(item["order"]), str(item["path"]), str(item["id"]))))
+
+
+def _legacy_hub_artifacts(model: Mapping[str, Any], decks: tuple[Mapping[str, Any], ...]) -> tuple[dict[str, object], ...]:
+    """Adapt the Task 5 deck call without widening package ownership."""
+    artifacts: list[dict[str, object]] = []
+    for index, section in enumerate(model.get("sections", ()), start=1):
+        section_type = str(section.get("type", ""))
+        card_type = "visual" if section_type in RELATIONAL_TYPES else "explanation"
+        artifacts.append({
+            "id": section["id"], "type": card_type, "title": section["title"],
+            "summary": section["summary"], "path": f'cards/{slugify(str(section["id"]))}.html',
+            "order": index, "count": 1,
+        })
+    offset = len(artifacts)
+    for index, deck in enumerate(decks, start=1):
+        deck_id = slugify(str(deck["id"])) or f"deck-{index}"
+        artifacts.append({
+            "id": deck["id"], "type": "deck", "title": deck["title"],
+            "summary": "Lesson deck", "path": f"decks/{index:03d}-{deck_id}/index.html",
+            "order": offset + index, "count": len(deck.get("sectionIds", ())),
+        })
+    return tuple(artifacts)
+
+
+def _render_hub_html(
+    model: Mapping[str, Any], artifacts: tuple[Mapping[str, Any], ...], status: str, theme_css: str
+) -> str:
+    if not isinstance(status, str):
+        raise ValueError("hub status must be a string")
+    session = model["session"]
+    records = _hub_artifacts(artifacts)
+    outline = "".join(
+        f'<li><a href="#turn-{index}">{_text(record["title"])}</a></li>'
+        for index, record in enumerate(records, start=1)
     )
-    deck_markup = "".join(
-        f'<section id="deck-{slugify(str(deck["id"]))}" class="panel">'
-        f'<h2>{_text(deck["title"])}</h2><p>{len(deck["sectionIds"])} slides</p></section>'
-        for deck in decks
+    cards = "".join(
+        f'<article id="turn-{index}" class="hub-card card--{record["type"]}"><p class="eyebrow">Turn {index:02d} · {record["type"]}</p>'
+        f'<h2>{_text(record["title"])}</h2><p>{_text(record["summary"])}</p>'
+        f'<p class="artifact-count">{record["count"]} artifact{"s" if record["count"] != 1 else ""}</p>'
+        f'<a class="artifact-link" href="{record["path"]}">Open artifact</a></article>'
+        for index, record in enumerate(records, start=1)
     )
-    payload = json.dumps(
-        {
-            "sessionId": model["session"]["id"],
-            "topic": model["session"]["topic"],
-            "deckIds": [deck["id"] for deck in decks],
-        },
-        ensure_ascii=False,
-        separators=(",", ":"),
-    ).replace("</", "<\\/")
-    refresh_script = (
-        '<script id="lesson-refresh">window.dispatchEvent(new Event("lesson-refresh"));</script>'
-        if refresh
-        else ""
-    )
+    payload = _safe_json({
+        "artifacts": records, "sessionId": session["id"], "status": status,
+        "topic": session["topic"],
+    })
+    refresh_script = f'<script id="lesson-refresh" data-contract="v1">{HUB_REFRESH_BODY}</script>' if status in HUB_ACTIVE_STATUSES else ""
     body = (
-        '<main class="page"><article class="lesson-card"><section class="panel">'
-        '<p class="eyebrow">Learning session</p>'
-        f'<h1>{_text(model["session"]["topic"])}</h1>'
-        f'<p>{_text(model["question"])}</p><ol>{deck_items}</ol></section>{deck_markup}</article></main>'
+        '<main class="hub-page"><header class="hub-header"><p class="eyebrow">Guided timeline</p>'
+        f'<h1>{_text(session["topic"])}</h1><dl class="hub-meta"><div><dt>Day</dt><dd>Day {int(session["day"]):02d}</dd></div>'
+        f'<div><dt>Mode</dt><dd>{_text(session["mode"])}</dd></div><div><dt>Depth</dt><dd>{_text(session["depth"])}</dd></div>'
+        f'<div><dt>Status</dt><dd>{_text(status)}</dd></div></dl>'
+        f'<p class="hub-question">{_text(model["question"])}</p><p class="hub-sync-state">Unsynced changes: {"sync required" if status == "unsynced" else "none"}</p></header>'
+        '<div class="hub-layout"><nav class="turn-outline" aria-label="Turn outline"><h2>Turn outline</h2><ol>'
+        f'{outline}</ol></nav><section class="timeline" aria-label="Chronological lesson cards">{cards}</section></div></main>'
     )
-    html = (
-        '<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width, initial-scale=1">'
-        f'<title>{_text(model["session"]["topic"])}</title><style>{theme_css}</style></head><body>{body}'
-        f'<script id="lesson-data" type="application/json">{payload}</script>{refresh_script}</body></html>'
+    return render_template(
+        "lesson-hub.html", title=_text(session["topic"]), theme_css=theme_css,
+        body=body, data_script=f'<script id="lesson-data" type="application/json">{payload}</script>',
+        refresh_script=refresh_script,
     )
-    return RenderedArtifact(
-        id="hub",
-        title=str(model["session"]["topic"]),
-        profile="hub",
-        relative_path="index.html",
-        html=html,
-        required_terms=(),
-    )
+
+
+def render_hub(
+    model: Mapping[str, Any], artifacts: tuple[Mapping[str, Any], ...], status: str, theme_css: str | bool
+) -> str | RenderedArtifact:
+    """Render the guided hub; preserve the Task 5 deck/refresh call as an adapter."""
+    if isinstance(theme_css, bool):
+        legacy_html = _render_hub_html(
+            model, _legacy_hub_artifacts(model, artifacts), "studying" if theme_css else "closed", status
+        )
+        return RenderedArtifact("hub", str(model["session"]["topic"]), "hub", "index.html", legacy_html, ())
+    return _render_hub_html(model, artifacts, status, theme_css)

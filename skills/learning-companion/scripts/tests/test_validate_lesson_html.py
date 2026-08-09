@@ -28,7 +28,15 @@ HUB_HTML = """<!doctype html>
 <style>@media (max-width: 390px) {.layout { display: block; }} @media (prefers-reduced-motion: reduce) {* { animation: none; }} @media (prefers-color-scheme: dark) {body { color-scheme: dark; }}</style></head>
 <body><section class="layout">企业 AI 系统分层</section>
 <script id="lesson-data" type="application/json">{"title":"企业 AI 系统分层"}</script>
-<script id="lesson-refresh">window.dispatchEvent(new Event("lesson-refresh"));</script>
+<script id="lesson-refresh" data-contract="v1">(() => {
+  const key = `learning-companion-scroll:${location.pathname}`;
+  addEventListener("beforeunload", () => sessionStorage.setItem(key, String(scrollY)));
+  addEventListener("load", () => {
+    const saved = Number(sessionStorage.getItem(key) || "0");
+    if (Number.isFinite(saved)) scrollTo(0, saved);
+  });
+  setTimeout(() => location.reload(), 5000);
+})();</script>
 </body></html>"""
 
 
@@ -39,7 +47,7 @@ class ValidateLessonHtmlTest(unittest.TestCase):
         self.path = Path(self.temp_dir.name) / "lesson.html"
 
     def write(self, text, encoding="utf-8"):
-        self.path.write_text(text, encoding=encoding)
+        self.path.write_text(text, encoding=encoding, newline="\n")
         return self.path
 
     def test_document_allows_no_svg_but_rejects_script(self):
@@ -81,8 +89,22 @@ class ValidateLessonHtmlTest(unittest.TestCase):
     def test_hub_requires_one_json_data_script_and_exact_refresh_body(self):
         missing_data = HUB_HTML.replace('<script id="lesson-data" type="application/json">{"title":"企业 AI 系统分层"}</script>', "")
         self.assertIn("hub-data-script-invalid", validate_html(self.write(missing_data), (), "hub")["errors"])
-        changed_refresh = HUB_HTML.replace("lesson-refresh\"));", "unexpected\"));")
+        changed_refresh = HUB_HTML.replace("5000", "5001")
         self.assertIn("hub-refresh-script-invalid", validate_html(self.write(changed_refresh), (), "hub")["errors"])
+
+    def test_hub_refresh_rejects_duplicate_and_unexpected_attributes(self):
+        duplicate = HUB_HTML.replace("</body>", HUB_HTML.split('<script id="lesson-refresh"', 1)[1].join(('<script id="lesson-refresh"', "")) + "</body>")
+        self.assertIn("hub-refresh-script-invalid", validate_html(self.write(duplicate), (), "hub")["errors"])
+        unexpected = HUB_HTML.replace('data-contract="v1"', 'data-contract="v1" nonce="nope"')
+        self.assertIn("hub-script-attributes-invalid", validate_html(self.write(unexpected), (), "hub")["errors"])
+        invalid_contract = HUB_HTML.replace('data-contract="v1"', 'data-contract="v2"')
+        self.assertIn("hub-script-attributes-invalid", validate_html(self.write(invalid_contract), (), "hub")["errors"])
+
+    def test_hub_allows_only_contained_artifact_links(self):
+        contained = HUB_HTML.replace("企业 AI 系统分层</section>", '企业 AI 系统分层 <a href="visuals/001-responsibility-map.html">map</a></section>')
+        self.assertEqual("passed", validate_html(self.write(contained), (), "hub")["overall"])
+        escaped = contained.replace("visuals/001-responsibility-map.html", "../escape.html")
+        self.assertIn("external-resource-forbidden", validate_html(self.write(escaped), (), "hub")["errors"])
 
     def test_unknown_profile_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "unknown profile: unknown"):

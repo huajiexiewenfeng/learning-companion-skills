@@ -17,7 +17,17 @@ from urllib.parse import unquote
 DEFAULT_MAX_BYTES = 2_000_000
 PROFILES = frozenset({"document", "technical-visual", "hub"})
 ALLOWED_HUB_SCRIPTS = frozenset({"lesson-data", "lesson-refresh"})
-HUB_REFRESH_BODY_SHA256 = "e8b44f8325dc81d0261961d7e465546dcd5eaee2facf01425a92268a99bcd520"
+HUB_ACTIVE_STATUSES = frozenset({"studying", "awaiting-voice", "unsynced"})
+HUB_REFRESH_BODY = """(() => {
+  const key = `learning-companion-scroll:${location.pathname}`;
+  addEventListener("beforeunload", () => sessionStorage.setItem(key, String(scrollY)));
+  addEventListener("load", () => {
+    const saved = Number(sessionStorage.getItem(key) || "0");
+    if (Number.isFinite(saved)) scrollTo(0, saved);
+  });
+  setTimeout(() => location.reload(), 5000);
+})();"""
+HUB_REFRESH_BODY_SHA256 = hashlib.sha256(HUB_REFRESH_BODY.encode("utf-8")).hexdigest()
 RESOURCE_ATTRIBUTES = frozenset({"src", "srcset", "href", "poster", "action", "data"})
 VOID_TAGS = frozenset({"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"})
 EXECUTABLE_SCHEMES = frozenset({"javascript", "vbscript"})
@@ -30,6 +40,7 @@ NETWORK_PATTERNS = (
 CSS_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
 CSS_STRING = re.compile(r"(['\"])(?:\\.|(?!\1).)*\1", re.DOTALL)
 CSS_URL = re.compile(r"url\s*\(\s*(?:(['\"])(.*?)\1|([^\s)]+))\s*\)", re.IGNORECASE | re.DOTALL)
+HUB_ARTIFACT_PATH = re.compile(r"(?:cards|decks|visuals)/[A-Za-z0-9][A-Za-z0-9._/-]*\.html\Z")
 
 
 def append_once(errors: list[str], error: str) -> None:
@@ -106,7 +117,7 @@ class ContractParser(HTMLParser):
         self.svgs = 0
         self.scripts = 0
         self.iframes = 0
-        self.external_resources: list[str] = []
+        self.external_resources: list[tuple[str, str, str]] = []
         self.executable_urls: list[str] = []
         self.event_handlers: list[str] = []
         self.svg_records: list[dict[str, Any]] = []
@@ -141,7 +152,7 @@ class ContractParser(HTMLParser):
         normalized_tag = tag.lower()
         self._validate_start(normalized_tag, attrs)
         attributes = {name.lower(): value for name, value in attrs}
-        self._record_attributes(attrs)
+        self._record_attributes(normalized_tag, attrs)
 
         if normalized_tag == "html":
             self.html_roots += 1
@@ -259,7 +270,7 @@ class ContractParser(HTMLParser):
         if tag == "section" and "body" not in self._tag_stack:
             self.mark_malformed()
 
-    def _record_attributes(self, attrs: list[tuple[str, str | None]]) -> None:
+    def _record_attributes(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         for name, value in attrs:
             normalized_name = name.lower()
             if normalized_name.startswith("on"):
@@ -269,7 +280,7 @@ class ContractParser(HTMLParser):
             if normalized_name in RESOURCE_ATTRIBUTES and value is not None:
                 violation = url_violation(value)
                 if violation == "external-resource-forbidden":
-                    self.external_resources.append(value)
+                    self.external_resources.append((tag, normalized_name, value))
                 elif violation == "executable-url-forbidden":
                     self.executable_urls.append(value)
 
@@ -296,6 +307,14 @@ def decode_utf8_without_bom(raw: bytes) -> tuple[str, list[str]]:
         return (raw[3:] if has_bom else raw).decode("utf-8", errors="replace"), errors
 
 
+def is_contained_hub_artifact_link(tag: str, attribute: str, value: str) -> bool:
+    """Allow only renderer-owned, relative artifact links inside the hub."""
+    if tag != "a" or attribute != "href" or not HUB_ARTIFACT_PATH.fullmatch(value):
+        return False
+    parts = value.split("/")
+    return all(part not in {"", ".", ".."} for part in parts)
+
+
 def enforce_shared_contract(
     parser: ContractParser,
     text: str,
@@ -303,6 +322,7 @@ def enforce_shared_contract(
     required_terms: tuple[str, ...],
     max_bytes: int,
     errors: list[str],
+    profile: str,
 ) -> None:
     if parser.malformed:
         append_once(errors, "malformed-html")
@@ -318,7 +338,10 @@ def enforce_shared_contract(
         append_once(errors, "event-handler-forbidden")
     if parser.executable_urls:
         append_once(errors, "executable-url-forbidden")
-    if parser.external_resources:
+    if any(
+        profile != "hub" or not is_contained_hub_artifact_link(*resource)
+        for resource in parser.external_resources
+    ):
         append_once(errors, "external-resource-forbidden")
     if parser.svg_records and any(
         not (record["role"] and record["title"] and record["desc"])
@@ -379,14 +402,17 @@ def has_relational_svg(parser: ContractParser) -> bool:
 def enforce_hub_scripts(parser: ContractParser, errors: list[str]) -> None:
     data_scripts: list[dict[str, Any]] = []
     refresh_scripts: list[dict[str, Any]] = []
+    data_payload: object = None
     for record in parser.script_records:
         attrs = record["attrs"]
         script_id = attrs.get("id")
         if script_id not in ALLOWED_HUB_SCRIPTS:
             append_once(errors, "hub-script-not-allowlisted")
             continue
-        allowed_attributes = {"id", "type"}
+        allowed_attributes = {"id", "type"} if script_id == "lesson-data" else {"id", "data-contract"}
         if set(attrs) - allowed_attributes:
+            append_once(errors, "hub-script-attributes-invalid")
+        if script_id == "lesson-refresh" and attrs.get("data-contract") != "v1":
             append_once(errors, "hub-script-attributes-invalid")
         if script_id == "lesson-data":
             data_scripts.append(record)
@@ -399,23 +425,27 @@ def enforce_hub_scripts(parser: ContractParser, errors: list[str]) -> None:
         data_script = data_scripts[0]
         data_type = (data_script["attrs"].get("type") or "").strip().lower()
         try:
-            json.loads("".join(data_script["body"]))
+            data_payload = json.loads("".join(data_script["body"]))
         except (json.JSONDecodeError, ValueError):
             valid_json = False
+            data_payload = None
         else:
             valid_json = True
-        if data_type != "application/json" or not valid_json:
+        if data_type != "application/json" or not valid_json or not isinstance(data_payload, dict):
             append_once(errors, "hub-data-script-invalid")
-
+    status = data_payload.get("status") if isinstance(data_payload, dict) else None
     if len(refresh_scripts) > 1:
         append_once(errors, "hub-refresh-script-invalid")
     elif refresh_scripts:
         refresh_script = refresh_scripts[0]
         body = "".join(refresh_script["body"])
         digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
-        script_type = (refresh_script["attrs"].get("type") or "").strip().lower()
-        if script_type not in {"", "text/javascript"} or digest != HUB_REFRESH_BODY_SHA256:
+        if body != HUB_REFRESH_BODY or digest != HUB_REFRESH_BODY_SHA256:
             append_once(errors, "hub-refresh-script-invalid")
+    if status in HUB_ACTIVE_STATUSES and not refresh_scripts:
+        append_once(errors, "hub-refresh-script-invalid")
+    if status == "closed" and refresh_scripts:
+        append_once(errors, "hub-refresh-script-invalid")
 
 
 def validate_html(
@@ -437,7 +467,7 @@ def validate_html(
         parser.mark_malformed()
     parser.finish()
 
-    enforce_shared_contract(parser, text, raw, required_terms, max_bytes, errors)
+    enforce_shared_contract(parser, text, raw, required_terms, max_bytes, errors, profile)
     if profile == "technical-visual":
         if parser.svgs == 0:
             append_once(errors, "svg-missing")

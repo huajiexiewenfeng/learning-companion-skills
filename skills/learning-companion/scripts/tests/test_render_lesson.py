@@ -27,10 +27,25 @@ try:
 except ImportError:
     render_relation = None
 
+try:
+    from render_lesson import render_hub
+except ImportError:
+    render_hub = None
+
 FIXTURES = Path(__file__).parent / "fixtures"
 ASSETS = SCRIPT_DIR.parent / "assets"
 THEME = ASSETS / "lesson-theme.css"
 BASE_MODEL = load_lesson_model(FIXTURES / "valid-lesson-model.json")
+HUB_ARTIFACTS = (
+    {"id": "answer", "type": "answer", "title": "Answer", "summary": "State the answer.", "path": "cards/007-answer.html", "order": 7},
+    {"id": "conclusion", "type": "conclusion", "title": "Conclusion", "summary": "State the outcome.", "path": "cards/001-conclusion.html", "order": 1},
+    {"id": "visual", "type": "visual", "title": "Responsibility map", "summary": "Show the boundaries.", "path": "visuals/001-responsibility-map.html", "order": 5},
+    {"id": "explanation", "type": "explanation", "title": "Explanation", "summary": "Explain the evidence.", "path": "cards/002-explanation.html", "order": 2},
+    {"id": "case", "type": "case", "title": "Case", "summary": "Apply the rule.", "path": "cards/003-case.html", "order": 3},
+    {"id": "misconception", "type": "misconception", "title": "Misconception", "summary": "Avoid the shortcut.", "path": "cards/004-misconception.html", "order": 4},
+    {"id": "check", "type": "check", "title": "Check", "summary": "Confirm the transition.", "path": "cards/006-check.html", "order": 6},
+    {"id": "correction", "type": "correction", "title": "Correction", "summary": "Correct the record.", "path": "cards/008-correction.html", "order": 8},
+)
 
 
 class RenderLessonTest(unittest.TestCase):
@@ -48,6 +63,54 @@ class RenderLessonTest(unittest.TestCase):
             path.write_text(artifact.html, encoding="utf-8", newline="\n")
             report = validate_html(path, artifact.required_terms, artifact.profile)
         self.assertEqual("passed", report["overall"], report["errors"])
+
+    def render_hub_html(self, status, model=BASE_MODEL, artifacts=HUB_ARTIFACTS):
+        self.assertIsNotNone(render_hub, "the lesson hub renderer must exist")
+        return render_hub(model, artifacts, status, self.theme_css())
+
+    def test_active_hub_uses_allowlisted_refresh_and_timeline_layout(self):
+        html = self.render_hub_html("studying")
+        self.assertIsInstance(html, str)
+        self.assertIn('id="lesson-data" type="application/json"', html)
+        self.assertIn('id="lesson-refresh" data-contract="v1"', html)
+        self.assertIn("5000", html)
+        for token in ("Day 01", "text", "medium", "studying", "Turn outline", "Unsynced changes"):
+            self.assertIn(token, html)
+        for artifact in HUB_ARTIFACTS:
+            self.assertIn(artifact["path"], html)
+            self.assertIn(f'card--{artifact["type"]}', html)
+        self.assertLess(html.index("cards/001-conclusion.html"), html.index("cards/008-correction.html"))
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "index.html"
+            path.write_text(html, encoding="utf-8", newline="\n")
+            report = validate_html(path, ("企业 AI 系统分层",), "hub")
+        self.assertEqual("passed", report["overall"], report["errors"])
+
+    def test_awaiting_voice_and_unsynced_hubs_refresh_but_closed_hub_keeps_links(self):
+        for status in ("awaiting-voice", "unsynced"):
+            with self.subTest(status=status):
+                self.assertIn('id="lesson-refresh"', self.render_hub_html(status))
+        closed = self.render_hub_html("closed")
+        self.assertNotIn('id="lesson-refresh"', closed)
+        self.assertIn("visuals/001-responsibility-map.html", closed)
+
+    def test_hub_data_json_cannot_break_out_of_its_script_element(self):
+        model = copy.deepcopy(BASE_MODEL)
+        model["session"]["topic"] = "</script><script>alert(1)</script>\u2028\u2029"
+        html = self.render_hub_html("studying", model)
+        payload = html.split('<script id="lesson-data" type="application/json">', 1)[1].split("</script>", 1)[0]
+        self.assertNotIn("</script", payload.lower())
+        self.assertNotIn("\u2028", payload)
+        self.assertNotIn("\u2029", payload)
+        self.assertIn("&lt;/script&gt;&lt;script&gt;alert(1)&lt;/script&gt;", html.split('<script id="lesson-data"', 1)[0])
+
+    def test_hub_rendering_is_deterministic_and_rejects_unsafe_artifact_paths(self):
+        first = self.render_hub_html("studying")
+        second = self.render_hub_html("studying")
+        self.assertEqual(first.encode("utf-8"), second.encode("utf-8"))
+        unsafe = HUB_ARTIFACTS + ({"id": "escape", "type": "answer", "title": "Bad", "summary": "Bad", "path": "../escape.html", "order": 9},)
+        with self.assertRaisesRegex(ValueError, "contained artifact path"):
+            self.render_hub_html("studying", artifacts=unsafe)
 
     def test_same_model_is_byte_identical(self):
         model = load_lesson_model(FIXTURES / "valid-lesson-model.json")
