@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "learning-companion.lesson-model.v1",
+  "session": {"id": "session-1", "planId": "plan", "day": 1, "topic": "Topic", "mode": "text", "depth": "medium", "status": "preparing"},
+  "theme": "systems-engineering",
+  "question": "What makes systems reliable?",
+  "requiredTerms": ["reliability"],
+  "sections": [
+    {
+      "id": "broken-flow",
+      "type": "flow",
+      "title": "Broken flow",
+      "summary": "A flow with a dangling edge",
+      "nodes": [{"id": "model", "label": "Model", "kind": "neutral"}],
+      "edges": [{"from": "model", "to": "missing", "label": "handoff"}],
+      "sourceRefs": ["source.md#One"]
+    }
+  ]
+}

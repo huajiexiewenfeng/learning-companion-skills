@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "learning-companion.lesson-model.v1",
+  "session": {"id": "session-1", "planId": "plan", "day": 1, "topic": "Topic", "mode": "text", "depth": "medium", "status": "preparing"},
+  "theme": "systems-engineering",
+  "question": "What makes systems reliable?",
+  "requiredTerms": ["reliability"],
+  "sections": [
+    {"id": "unknown", "type": "raw-html", "title": "Unsupported", "summary": "Unsupported component", "sourceRefs": ["source.md#One"]}
+  ]
+}
