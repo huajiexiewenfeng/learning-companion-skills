@@ -62,7 +62,30 @@
         "nodes": {"type": "array", "items": {"$ref": "#/$defs/node"}},
         "edges": {"type": "array", "items": {"$ref": "#/$defs/edge"}},
         "sourceRefs": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
-      }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"type": {"const": "boundary-map"}}},
+          "then": {
+            "required": ["nodes"],
+            "properties": {
+              "nodes": {
+                "type": "array",
+                "minItems": 2,
+                "items": {
+                  "allOf": [
+                    {"$ref": "#/$defs/node"},
+                    {
+                      "required": ["group"],
+                      "properties": {"group": {"type": "string", "minLength": 1}}
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "node": {
       "type": "object",
@@ -71,7 +94,9 @@
       "properties": {
         "id": {"type": "string", "minLength": 1},
         "label": {"type": "string", "minLength": 1},
-        "kind": {"type": "string", "minLength": 1}
+        "detail": {"type": "string"},
+        "kind": {"type": "string", "minLength": 1},
+        "group": {"type": "string"}
       }
     },
     "edge": {

@@ -126,6 +126,7 @@ def _relation_nodes(section: Mapping[str, Any]) -> tuple[Mapping[str, Any], ...]
         or not isinstance(node.get("label"), str)
         or not node["label"]
         or ("detail" in node and not isinstance(node["detail"], str))
+        or ("group" in node and not isinstance(node["group"], str))
         for node in nodes
     ):
         raise ValueError("relational section requires declared nodes")
@@ -189,26 +190,26 @@ def _node_detail(node: Mapping[str, Any]) -> str:
 def _boundary_layout(
     nodes: tuple[Mapping[str, Any], ...]
 ) -> tuple[dict[str, tuple[int, int]], str]:
-    """Lay out factual kind groups without inferring a group from node index."""
+    """Lay out factual declared groups without inferring a group from node index."""
     groups: dict[str, list[Mapping[str, Any]]] = {}
     for node in nodes:
-        kind = node.get("kind")
-        if not isinstance(kind, str) or kind not in SEMANTIC_KINDS:
-            raise ValueError("boundary-map requires meaningful declared groups")
-        groups.setdefault(kind, []).append(node)
+        group = node.get("group")
+        if not isinstance(group, str) or not group.strip():
+            raise ValueError("boundary-map requires declared groups")
+        groups.setdefault(group, []).append(node)
     if len(groups) < 2:
-        raise ValueError("boundary-map requires meaningful declared groups")
+        raise ValueError("boundary-map requires at least two declared groups")
 
     positions: dict[str, tuple[int, int]] = {}
     markup: list[str] = ['<g class="diagram-boundaries">']
-    for group_index, (kind, group_nodes) in enumerate(groups.items()):
+    for group_index, (group, group_nodes) in enumerate(groups.items()):
         left = 20 + group_index * (NODE_WIDTH + NODE_GAP * 2)
         first_y = 100
         height = len(group_nodes) * NODE_HEIGHT + (len(group_nodes) - 1) * NODE_GAP + 100
         markup.append(
             f'<g class="diagram-boundary-group"><rect class="diagram-boundary" x="{left}" y="40" '
             f'width="{NODE_WIDTH + NODE_GAP}" height="{height}" rx="20"></rect>'
-            f'<text class="diagram-boundary-label" x="{left + 20}" y="72">{_text(kind)}</text></g>'
+            f'<text class="diagram-boundary-label" x="{left + 20}" y="72">{_text(group)}</text></g>'
         )
         for node_index, node in enumerate(group_nodes):
             positions[node["id"]] = (left + 20, first_y + node_index * (NODE_HEIGHT + NODE_GAP))
@@ -298,9 +299,15 @@ def _render_mobile_node(node: Mapping[str, Any]) -> str:
         f'<span class="mobile-flow-detail">{_text(detail)}</span>' if detail else ""
     )
     kind_markup = f'<span class="mobile-flow-kind">{_node_kind(node)}</span>'
+    group = node.get("group", "")
+    group_markup = (
+        f'<span class="mobile-flow-group">{_text(group)}</span>'
+        if isinstance(group, str) and group
+        else ""
+    )
     return (
         f'<li class="mobile-flow-node mobile-flow-node--{_node_kind(node)}">'
-        f'<strong>{_text(node["label"])}</strong>{detail_markup}{kind_markup}</li>'
+        f'<strong>{_text(node["label"])}</strong>{detail_markup}{kind_markup}{group_markup}</li>'
     )
 
 

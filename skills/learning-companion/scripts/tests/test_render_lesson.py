@@ -184,6 +184,7 @@ class RenderLessonTest(unittest.TestCase):
                             "id": f"node-{index}",
                             "label": f"Node {index}",
                             "kind": ("neutral", "gate", "risk")[index % 3],
+                            "group": f"Group {index % 2}",
                         }
                         for index in range(node_count)
                     ]
@@ -256,21 +257,49 @@ class RenderLessonTest(unittest.TestCase):
             )
         self.assertLess(mobile.index("First edge"), mobile.index("Second edge"))
 
-    def test_boundary_map_uses_declared_kind_groups_and_rejects_one_group(self):
+    def test_boundary_map_uses_explicit_groups_and_kind_changes_do_not_regroup_nodes(self):
         self.assertIsNotNone(render_relation, "the relationship renderer must exist")
         boundary = next(
             section for section in BASE_MODEL["sections"] if section["type"] == "boundary-map"
         )
         html = render_relation(boundary)
-        for kind in ("neutral", "gate", "risk"):
+        mobile = html.split('<ol class="mobile-semantic-flow">', 1)[1]
+        groups = tuple(dict.fromkeys(node["group"] for node in boundary["nodes"]))
+        for group in groups:
             self.assertIn('class="diagram-boundary-label"', html)
-            self.assertIn(f'>{kind}</text>', html)
+            self.assertIn(f'>{group}</text>', html)
+            self.assertIn(f'<span class="mobile-flow-group">{group}</span>', mobile)
 
-        one_group = copy.deepcopy(boundary)
-        for node in one_group["nodes"]:
-            node["kind"] = "neutral"
-        with self.assertRaisesRegex(ValueError, "meaningful declared groups"):
-            render_relation(one_group)
+        changed_kinds = copy.deepcopy(boundary)
+        for node in changed_kinds["nodes"]:
+            node["kind"] = "success"
+        changed_html = render_relation(changed_kinds)
+        for group in groups:
+            self.assertIn(f'>{group}</text>', changed_html)
+
+        missing_group = copy.deepcopy(boundary)
+        missing_group["nodes"][0].pop("group")
+        with self.assertRaisesRegex(ValueError, "declared groups"):
+            render_relation(missing_group)
+
+    def test_relation_node_and_edge_labels_are_escaped(self):
+        self.assertIsNotNone(render_relation, "the relationship renderer must exist")
+        section = {
+            "id": "escaped-flow",
+            "type": "flow",
+            "title": "Escaped labels",
+            "summary": "Renderer output remains text-only.",
+            "nodes": [
+                {"id": "first", "label": "<first & node>", "kind": "neutral"},
+                {"id": "second", "label": "<second & node>", "kind": "success"},
+            ],
+            "edges": [{"from": "first", "to": "second", "label": "<edge & label>"}],
+        }
+        html = render_relation(section)
+        self.assertNotIn("<first & node>", html)
+        self.assertNotIn("<edge & label>", html)
+        self.assertIn("&lt;first &amp; node&gt;", html)
+        self.assertIn("&lt;edge &amp; label&gt;", html)
 
     def test_relation_output_is_byte_identical_and_uses_slugged_accessibility_ids(self):
         self.assertIsNotNone(render_relation, "the relationship renderer must exist")

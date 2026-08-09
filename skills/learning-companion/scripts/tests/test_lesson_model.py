@@ -1,4 +1,5 @@
 import copy
+import json
 from pathlib import Path
 import sys
 import unittest
@@ -11,6 +12,7 @@ from lesson_model import load_lesson_model, required_terms, slugify, validate_le
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
+SCHEMA = SCRIPT_DIR.parent / "references" / "lesson-model.schema.json"
 
 
 class LessonModelTest(unittest.TestCase):
@@ -42,6 +44,46 @@ class LessonModelTest(unittest.TestCase):
 
     def test_slug_is_stable(self):
         self.assertEqual("day-01-ai-systems", slugify("Day 01: AI Systems"))
+
+    def test_schema_declares_optional_node_detail_and_group(self):
+        schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+        node = schema["$defs"]["node"]
+        self.assertEqual({"type": "string"}, node["properties"]["detail"])
+        self.assertEqual({"type": "string"}, node["properties"]["group"])
+        self.assertNotIn("detail", node["required"])
+        self.assertNotIn("group", node["required"])
+
+    def test_node_detail_and_group_validator_contract(self):
+        valid_without_optional_node_facts = self.valid_model()
+        valid_without_optional_node_facts["sections"][1]["nodes"][0].pop("detail")
+        self.assertNotIn(
+            "node-detail-invalid", self.issue_codes(valid_without_optional_node_facts)
+        )
+
+        cases = (
+            ("detail non-string", "detail", 1, "node-detail-invalid"),
+            ("group non-string", "group", 1, "node-group-invalid"),
+        )
+        for name, field, value, expected_code in cases:
+            with self.subTest(name=name):
+                model = self.valid_model()
+                model["sections"][1]["nodes"][0][field] = value
+                self.assertIn(expected_code, self.issue_codes(model))
+
+    def test_boundary_groups_are_required_and_distinct(self):
+        boundary_index = next(
+            index
+            for index, section in enumerate(self.valid_model()["sections"])
+            if section["type"] == "boundary-map"
+        )
+        missing_group = self.valid_model()
+        missing_group["sections"][boundary_index]["nodes"][0].pop("group")
+        self.assertIn("boundary-group-required", self.issue_codes(missing_group))
+
+        one_group = self.valid_model()
+        for node in one_group["sections"][boundary_index]["nodes"]:
+            node["group"] = "same-boundary"
+        self.assertIn("boundary-groups-insufficient", self.issue_codes(one_group))
 
     def test_malformed_values_return_issues_without_raising(self):
         cases = (

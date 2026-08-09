@@ -33,10 +33,10 @@
       "title": "可靠交付保障链",
       "summary": "建议经过证据、流程和治理后成为可靠交付。",
       "nodes": [
-        {"id": "model", "label": "模型建议", "kind": "neutral"},
-        {"id": "evidence", "label": "知识与证据", "kind": "success"},
-        {"id": "workflow", "label": "流程与工具", "kind": "active"},
-        {"id": "human", "label": "人类门禁", "kind": "gate"}
+        {"id": "model", "label": "模型建议", "detail": "生成候选方案", "kind": "neutral"},
+        {"id": "evidence", "label": "知识与证据", "detail": "检索权威依据", "kind": "success"},
+        {"id": "workflow", "label": "流程与工具", "detail": "执行受控操作", "kind": "active"},
+        {"id": "human", "label": "人类门禁", "detail": "审批完成交付", "kind": "gate"}
       ],
       "edges": [
         {"from": "model", "to": "evidence", "label": "核对"},
@@ -53,9 +53,9 @@
       "title": "权威状态分层",
       "summary": "状态由记录层托底，再由流程层和体验层使用。",
       "nodes": [
-        {"id": "record", "label": "Authoritative State", "kind": "success"},
-        {"id": "workflow-layer", "label": "流程编排", "kind": "active"},
-        {"id": "experience", "label": "业务体验", "kind": "neutral"}
+        {"id": "record", "label": "Authoritative State", "detail": "唯一事实来源", "kind": "success"},
+        {"id": "workflow-layer", "label": "流程编排", "detail": "协调状态转换", "kind": "active"},
+        {"id": "experience", "label": "业务体验", "detail": "呈现可验证结果", "kind": "neutral"}
       ],
       "edges": [
         {"from": "record", "to": "workflow-layer", "label": "提供事实"},
@@ -69,9 +69,9 @@
       "title": "系统边界与门禁",
       "summary": "模型输出跨越工具边界时必须经过风险门禁。",
       "nodes": [
-        {"id": "assistant", "label": "模型输出", "kind": "neutral"},
-        {"id": "gateway", "label": "工具网关", "kind": "gate"},
-        {"id": "review", "label": "风险复核", "kind": "risk"}
+        {"id": "assistant", "label": "模型输出", "detail": "提出受控请求", "kind": "neutral", "group": "模型边界"},
+        {"id": "gateway", "label": "工具网关", "detail": "执行权限检查", "kind": "gate", "group": "治理边界"},
+        {"id": "review", "label": "风险复核", "detail": "记录审批证据", "kind": "risk", "group": "治理边界"}
       ],
       "edges": [
         {"from": "assistant", "to": "gateway", "label": "请求工具"},
@@ -85,9 +85,9 @@
       "title": "可靠交付时间线",
       "summary": "交付按证据、执行和验收的顺序推进。",
       "nodes": [
-        {"id": "prepare", "label": "准备证据", "kind": "success"},
-        {"id": "operate", "label": "执行变更", "kind": "active"},
-        {"id": "accept", "label": "完成验收", "kind": "gate"}
+        {"id": "prepare", "label": "准备证据", "detail": "收集可追溯输入", "kind": "success"},
+        {"id": "operate", "label": "执行变更", "detail": "记录运行状态", "kind": "active"},
+        {"id": "accept", "label": "完成验收", "detail": "确认可交付结果", "kind": "gate"}
       ],
       "edges": [
         {"from": "prepare", "to": "operate", "label": "进入执行"},

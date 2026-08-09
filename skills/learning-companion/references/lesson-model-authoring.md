@@ -19,6 +19,8 @@ The only permitted section components are:
 
 Each section uses the ordered fields `id`, `type`, `title`, `summary`, `nodes`, `edges`, `sourceRefs`; omit `nodes` and `edges` for non-relational components. `layer-map`, `boundary-map`, `flow`, and `timeline` are relational: their node IDs must be unique and every edge's `from` and `to` must resolve to a node. Every section needs at least one real `sourceRefs` entry. Deck IDs and titles must be unique, and every ordered `sectionIds` entry must resolve to an existing section.
 
+Each node uses `id`, `label`, optional `detail`, `kind`, and optional `group`. `detail`, when present, is a string rendered in both desktop and mobile relationship alternatives. `group` is a string used only for declared `boundary-map` membership: every boundary node must provide a nonempty `group`, and a boundary map must contain at least two distinct group values. Boundary boxes and labels are derived only from these declared `group` values; `kind` controls the fixed semantic color/class and never determines grouping. Other relational component types may omit `group`.
+
 ## Complete valid example
 
 ```json
@@ -31,7 +33,7 @@ Each section uses the ordered fields `id`, `type`, `title`, `summary`, `nodes`, 
   "decks": [{"id": "system-layers", "title": "企业 AI 系统分层主课件", "sectionIds": ["core-concept", "runtime-flow"]}],
   "sections": [
     {"id": "core-concept", "type": "concept", "title": "模型能力不等于系统能力", "summary": "模型负责推理，系统负责事实、状态、流程、风险和结果。", "sourceRefs": ["dashboard.md#Today"]},
-    {"id": "runtime-flow", "type": "flow", "title": "可靠交付保障链", "summary": "建议经过证据、流程和治理后成为可靠交付。", "nodes": [{"id": "model", "label": "模型建议", "kind": "neutral"}, {"id": "evidence", "label": "知识与证据", "kind": "success"}], "edges": [{"from": "model", "to": "evidence", "label": "核对"}], "sourceRefs": ["learning-plan.md#Day-1"]}
+    {"id": "runtime-flow", "type": "flow", "title": "可靠交付保障链", "summary": "建议经过证据、流程和治理后成为可靠交付。", "nodes": [{"id": "model", "label": "模型建议", "detail": "生成候选方案", "kind": "neutral"}, {"id": "evidence", "label": "知识与证据", "detail": "检索权威依据", "kind": "success"}], "edges": [{"from": "model", "to": "evidence", "label": "核对"}], "sourceRefs": ["learning-plan.md#Day-1"]}
   ]
 }
 ```

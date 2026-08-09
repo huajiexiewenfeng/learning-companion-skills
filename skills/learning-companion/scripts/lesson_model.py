@@ -37,7 +37,7 @@ MODEL_KEYS = frozenset(
 SESSION_KEYS = frozenset({"id", "planId", "day", "topic", "mode", "depth", "status"})
 DECK_KEYS = frozenset({"id", "title", "sectionIds"})
 SECTION_KEYS = frozenset({"id", "type", "title", "summary", "nodes", "edges", "sourceRefs"})
-NODE_KEYS = frozenset({"id", "label", "kind"})
+NODE_KEYS = frozenset({"id", "label", "detail", "kind", "group"})
 EDGE_KEYS = frozenset({"from", "to", "label"})
 
 
@@ -167,7 +167,7 @@ def _validate_sections(sections: Any, issues: list[ValidationIssue]) -> set[str]
         )
         _validate_source_refs(section.get("sourceRefs"), f"{path}.sourceRefs", issues)
 
-        _validate_relations(section, path, component_type in RELATIONAL_TYPES, issues)
+        _validate_relations(section, path, component_type, issues)
 
     return section_ids
 
@@ -184,8 +184,11 @@ def _validate_source_refs(source_refs: Any, path: str, issues: list[ValidationIs
 
 
 def _validate_relations(
-    section: Mapping[str, Any], path: str, relational: bool, issues: list[ValidationIssue]
+    section: Mapping[str, Any], path: str, component_type: str, issues: list[ValidationIssue]
 ) -> None:
+    relational = component_type in RELATIONAL_TYPES
+    boundary_map = component_type == "boundary-map"
+    boundary_groups: set[str] = set()
     if "nodes" not in section:
         if relational:
             issues.append(ValidationIssue("nodes-empty", f"{path}.nodes", "expected at least one node"))
@@ -216,6 +219,39 @@ def _validate_relations(
             )
             _validate_nonempty_string(
                 node.get("kind"), f"{node_path}.kind", "node-kind-required", issues
+            )
+            if "detail" in node and not isinstance(node["detail"], str):
+                issues.append(
+                    ValidationIssue(
+                        "node-detail-invalid", f"{node_path}.detail", "expected a string"
+                    )
+                )
+            if "group" in node and not isinstance(node["group"], str):
+                issues.append(
+                    ValidationIssue(
+                        "node-group-invalid", f"{node_path}.group", "expected a string"
+                    )
+                )
+            group = node.get("group")
+            if boundary_map:
+                if not isinstance(group, str) or not group.strip():
+                    issues.append(
+                        ValidationIssue(
+                            "boundary-group-required",
+                            f"{node_path}.group",
+                            "expected a nonempty boundary group",
+                        )
+                    )
+                else:
+                    boundary_groups.add(group)
+
+        if boundary_map and len(boundary_groups) < 2:
+            issues.append(
+                ValidationIssue(
+                    "boundary-groups-insufficient",
+                    f"{path}.nodes",
+                    "expected at least two distinct boundary groups",
+                )
             )
 
     if "edges" not in section:
