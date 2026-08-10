@@ -2,7 +2,7 @@
 
 Author a lesson as JSON with `schemaVersion` set to `learning-companion.lesson-model.v1`. Keep the top-level fields in this exact order: `schemaVersion`, `session`, `theme`, `question`, `requiredTerms`, `decks`, `sections`. Omit `decks` when no curated deck is needed; do not reorder a deck's `sectionIds`.
 
-`session` fields are ordered as `id`, `planId`, `day`, `topic`, `mode`, `depth`, `status`. Modes are `text`, `voice`, or `hybrid`; depths are `shallow`, `medium`, or `deep`; statuses are `preparing`, `ready`, `in-progress`, `completed`, or `archived`.
+`session` fields are ordered as `id`, `planId`, `day`, `topic`, `mode`, `depth`, `status`. Modes are exactly `text` or `voice`; depths are exactly `light`, `medium`, or `deep`; lifecycle statuses are exactly `preparing`, `awaiting-voice`, `studying`, `closed`, or `error`. The stored lifecycle status is authoritative and is validated as written; a caller must never rewrite or normalize it merely to pass validation.
 
 The only permitted section components are:
 
@@ -17,7 +17,9 @@ The only permitted section components are:
 - `check-question`
 - `sources`
 
-Each section uses the ordered fields `id`, `type`, `title`, `summary`, `nodes`, `edges`, `sourceRefs`; omit `nodes` and `edges` for non-relational components. `layer-map`, `boundary-map`, `flow`, and `timeline` are relational: their node IDs must be unique and every edge's `from` and `to` must resolve to a node. Every section needs at least one real `sourceRefs` entry. Deck IDs and titles must be unique, and every ordered `sectionIds` entry must resolve to an existing section.
+Each section uses the ordered fields `id`, `type`, `title`, `summary`, `nodes`, `edges`, `sourceRefs`; omit `nodes` and `edges` for non-relational components. `layer-map`, `boundary-map`, `flow`, and `timeline` are relational: they require at least two nodes and one edge; node IDs are unique; both endpoints resolve; self-loops and duplicate directed edges are forbidden; every node participates; and the underlying undirected graph is connected. Every section needs at least one real `sourceRefs` entry. Deck IDs and titles must be unique, and every ordered `sectionIds` entry must resolve to an existing section.
+
+Logical artifact identity is global across hub, cards, decks, and slides. `hub` is reserved for the renderer-owned index. Authored IDs must produce nonempty ASCII slugs, and no two generated artifacts may share a logical ID or output path, even when their artifact types differ.
 
 Each node uses `id`, `label`, optional `detail`, `kind`, and boundary-only `group`. `detail`, when present, is a string rendered in both desktop and mobile relationship alternatives. `group` is legal only for declared `boundary-map` membership: every boundary node must provide a nonempty `group`, and a boundary map must contain at least two distinct group values. Boundary boxes and labels are derived only from these declared `group` values; `kind` controls the fixed semantic color/class and never determines grouping. All non-boundary component nodes must omit `group`.
 

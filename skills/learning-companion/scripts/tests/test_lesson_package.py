@@ -4,6 +4,7 @@ from datetime import date
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -29,6 +30,12 @@ except (ModuleNotFoundError, ImportError):
     lesson_package = None
     allocate_session = atomic_write_json = close_session = prepare_session = None
     session_context = sync_session = validate_session = None
+
+takeover_voice_session = (
+    getattr(lesson_package, "takeover_voice_session", None)
+    if lesson_package is not None
+    else None
+)
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -71,6 +78,13 @@ class LessonPackageTest(unittest.TestCase):
         (session / "lesson-model.json").write_text(
             json.dumps(model, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
+        lesson_path = session / "lesson.md"
+        lesson_text = lesson_path.read_text(encoding="utf-8")
+        turns = "".join(
+            f"\n<!-- lesson-turn-id: turn-{index:03d} -->\n## {section['title']}\n"
+            for index, section in enumerate(model["sections"], start=1)
+        )
+        lesson_path.write_text(lesson_text + turns, encoding="utf-8")
         return session
 
     def ledger(self, session):
@@ -146,6 +160,93 @@ class LessonPackageTest(unittest.TestCase):
         self.assertEqual(("passed", "awaiting-voice"), (report.overall, report.status))
         self.assertEqual("awaiting-voice", self.lesson_status(session))
 
+    def test_prepare_rejects_noncanonical_persisted_status_without_normalizing_it(self):
+        session = self.valid_session()
+        model_path = session / "lesson-model.json"
+        model = json.loads(model_path.read_text(encoding="utf-8"))
+        model["session"]["status"] = "completed"
+        model_path.write_text(json.dumps(model, ensure_ascii=False), encoding="utf-8")
+
+        report = prepare_session(session)
+
+        self.assertEqual(("failed", "preparing"), (report.overall, report.status))
+        self.assertIn("model-invalid:session-status:session.status", report.errors)
+        self.assertFalse((session / "index.html").exists())
+
+    def test_sync_rejects_mismatched_persisted_lifecycle_states(self):
+        session = self.valid_session()
+        lesson_path = session / "lesson.md"
+        lesson_path.write_text(
+            lesson_path.read_text(encoding="utf-8").replace(
+                "status: preparing", "status: studying"
+            ),
+            encoding="utf-8",
+        )
+
+        report = sync_session(session)
+
+        self.assertEqual(("failed", "studying"), (report.overall, report.status))
+        self.assertIn("lifecycle-status-mismatch:studying:preparing", report.errors)
+        self.assertFalse((session / "index.html").exists())
+
+    def test_voice_takeover_is_explicit_and_sync_preserves_studying(self):
+        self.assertIsNotNone(takeover_voice_session)
+        session = self.valid_session(mode="voice")
+        self.assertEqual("passed", prepare_session(session).overall)
+
+        takeover = takeover_voice_session(session)
+
+        self.assertEqual(("passed", "studying"), (takeover.overall, takeover.status))
+        self.assertEqual("studying", self.lesson_status(session))
+        model = json.loads((session / "lesson-model.json").read_text(encoding="utf-8"))
+        self.assertEqual("studying", model["session"]["status"])
+
+        synced = sync_session(session)
+
+        self.assertEqual(("passed", "studying"), (synced.overall, synced.status), synced.errors)
+        self.assertEqual("studying", self.lesson_status(session))
+        hub = (session / "index.html").read_text(encoding="utf-8")
+        self.assertIn('"status":"studying"', hub)
+        self.assertNotIn('"status":"awaiting-voice"', hub)
+
+        repeated = takeover_voice_session(session)
+        self.assertEqual(("failed", "studying"), (repeated.overall, repeated.status))
+        self.assertIn("voice-takeover-requires-awaiting-voice", repeated.errors)
+
+    def test_cli_voice_takeover_exposes_the_same_transition(self):
+        session = self.valid_session(mode="voice")
+        self.assertEqual("passed", prepare_session(session).overall)
+
+        result = subprocess.run(
+            [str(PYTHON), str(SCRIPT_DIR / "lesson_package.py"), "takeover", str(session)],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            check=False,
+        )
+
+        self.assertEqual(0, result.returncode, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(("passed", "studying"), (payload["overall"], payload["status"]))
+
+    def test_public_validate_does_not_create_or_modify_session_lock(self):
+        session = self.valid_session()
+        lock_path = session / ".lesson-session.lock"
+        self.assertFalse(lock_path.exists())
+
+        first = validate_session(session)
+
+        self.assertEqual("failed", first.overall)
+        self.assertFalse(lock_path.exists())
+
+        self.assertEqual("passed", prepare_session(session).overall)
+        before = (lock_path.read_bytes(), lock_path.stat().st_mtime_ns)
+
+        second = validate_session(session)
+
+        self.assertEqual("passed", second.overall, second.errors)
+        self.assertEqual(before, (lock_path.read_bytes(), lock_path.stat().st_mtime_ns))
+
     def test_global_required_term_union_is_a_prepare_gate(self):
         session = self.valid_session()
         model_path = session / "lesson-model.json"
@@ -174,6 +275,192 @@ class LessonPackageTest(unittest.TestCase):
         self.assertTrue((session / "cards" / "core-concept-v2.html").is_file())
         current = next(record for record in self.records(session) if record["id"] == "core-concept-v2")
         self.assertEqual("core-concept", current["supersedes"])
+
+    def test_ledger_source_turns_resolve_to_lesson_markdown_turn_records(self):
+        session = self.valid_session()
+
+        report = prepare_session(session)
+
+        self.assertEqual("passed", report.overall, report.errors)
+        lesson = (session / "lesson.md").read_text(encoding="utf-8")
+        declared = set(re.findall(r"^<!-- lesson-turn-id: ([a-z0-9-]+) -->$", lesson, re.MULTILINE))
+        self.assertTrue(declared)
+        self.assertTrue(all(record["sourceTurn"] in declared for record in self.records(session)))
+        self.assertNotIn("lesson-model.json", {record["sourceTurn"] for record in self.records(session)})
+
+    def test_prepare_rejects_missing_or_malformed_lesson_turn_records(self):
+        session = self.valid_session()
+        lesson_path = session / "lesson.md"
+        lesson = lesson_path.read_text(encoding="utf-8")
+        lesson_path.write_text(
+            lesson.replace(
+                "<!-- lesson-turn-id: turn-001 -->\n## 模型能力不等于系统能力",
+                "<!-- lesson-turn-id: INVALID TURN -->\nnot a heading",
+            ),
+            encoding="utf-8",
+        )
+
+        report = prepare_session(session)
+
+        self.assertEqual("failed", report.overall)
+        self.assertIn("lesson-turn-marker-invalid", report.errors)
+        self.assertFalse((session / "index.html").exists())
+
+    def test_validate_rejects_ledger_source_turn_not_declared_by_lesson(self):
+        session = self.valid_session()
+        self.assertEqual("passed", prepare_session(session).overall)
+        ledger_path = session / "artifacts.md"
+        ledger = self.ledger(session)
+        ledger["records"][0]["sourceTurn"] = "turn-999"
+        ledger_path.write_text(json.dumps(ledger, ensure_ascii=False), encoding="utf-8")
+
+        report = validate_session(session)
+
+        self.assertEqual("failed", report.overall)
+        self.assertIn("artifact-source-turn-unknown:hub:turn-999", report.errors)
+
+    def test_validate_requires_contiguous_ledger_versions_and_exact_supersedes_chain(self):
+        def versioned_session():
+            session = self.valid_session()
+            self.assertEqual("passed", prepare_session(session).overall)
+            model_path = session / "lesson-model.json"
+            model = json.loads(model_path.read_text(encoding="utf-8"))
+            model["sections"][0]["summary"] = "修订版本"
+            model_path.write_text(json.dumps(model, ensure_ascii=False), encoding="utf-8")
+            self.assertEqual("passed", sync_session(session).overall)
+            return session
+
+        cases = (
+            (
+                "gap",
+                lambda records: next(
+                    record for record in records if record["id"] == "core-concept-v2"
+                ).update(version=3),
+                "artifact-ledger-version-gap:core-concept",
+            ),
+            (
+                "bad supersedes",
+                lambda records: next(
+                    record for record in records if record["id"] == "core-concept-v2"
+                ).update(supersedes="hub"),
+                "artifact-ledger-supersedes-invalid:core-concept-v2",
+            ),
+            (
+                "v1 supersedes",
+                lambda records: next(
+                    record for record in records if record["id"] == "core-concept"
+                ).update(supersedes="hub"),
+                "artifact-ledger-v1-supersedes:core-concept",
+            ),
+        )
+        for name, mutate, expected in cases:
+            with self.subTest(name=name):
+                session = versioned_session()
+                ledger_path = session / "artifacts.md"
+                ledger = self.ledger(session)
+                mutate(ledger["records"])
+                ledger_path.write_text(json.dumps(ledger, ensure_ascii=False), encoding="utf-8")
+                report = validate_session(session)
+                self.assertEqual("failed", report.overall)
+                self.assertIn(expected, report.errors)
+
+    def test_staging_rejects_non_bijective_spec_identity_before_writes(self):
+        session = self.valid_session()
+        context = session_context(session)
+        stage = session / ".identity-stage"
+        stage.mkdir()
+        base = lesson_package.ArtifactSpec(
+            logical_id="shared",
+            title="Shared",
+            artifact_type="card",
+            profile="document",
+            relative_path="cards/shared.html",
+            html="not reached",
+            source_turn="turn-001",
+            source_refs=("dashboard.md#Today",),
+            required_terms=(),
+        )
+        conflicts = (
+            (
+                base,
+                lesson_package.replace(
+                    base,
+                    artifact_type="slide",
+                    relative_path="decks/001-main/slides/001-shared.html",
+                ),
+                "artifact-spec-logical-id-conflict:shared",
+            ),
+            (
+                base,
+                lesson_package.replace(base, logical_id="other"),
+                "artifact-spec-path-conflict:cards/shared.html",
+            ),
+        )
+        for first, second, expected in conflicts:
+            with self.subTest(expected=expected):
+                with self.assertRaisesRegex(ValueError, expected.replace(".", r"\.")):
+                    lesson_package._write_and_validate_stage(
+                        context, stage, (first, second)
+                    )
+                self.assertFalse(any(path.is_file() for path in stage.rglob("*")))
+
+    def test_failed_html_sync_marks_last_valid_hub_unsynced_without_changing_lifecycle(self):
+        session = self.valid_session()
+        self.assertEqual("passed", prepare_session(session).overall)
+        model_path = session / "lesson-model.json"
+        model = json.loads(model_path.read_text(encoding="utf-8"))
+        model["sections"][0]["summary"] = "Markdown 已更新但 HTML 失败"
+        model_path.write_text(json.dumps(model, ensure_ascii=False), encoding="utf-8")
+
+        with patch.object(
+            lesson_package,
+            "_write_and_validate_stage",
+            side_effect=ValueError("forced-html-sync-failure"),
+        ):
+            report = sync_session(session)
+
+        self.assertEqual(("failed", "studying"), (report.overall, report.status))
+        self.assertEqual("studying", self.lesson_status(session))
+        persisted = json.loads(model_path.read_text(encoding="utf-8"))
+        self.assertEqual("studying", persisted["session"]["status"])
+        marker = json.loads((session / ".lesson-sync.json").read_text(encoding="utf-8"))
+        self.assertEqual("unsynced", marker["status"])
+        hub = (session / "index.html").read_text(encoding="utf-8")
+        self.assertIn("Unsynced changes: sync required", hub)
+        self.assertNotIn("Unsynced changes: none", hub)
+        self.assertIn('"syncStatus":"unsynced"', hub)
+        hub_record = next(record for record in self.records(session) if record["id"] == "hub")
+        self.assertEqual(lesson_package._sha256((session / "index.html").read_bytes()), hub_record["sha256"])
+        validation = validate_session(session)
+        self.assertIn("lesson-sync-required", validation.errors)
+
+    def test_sync_marker_write_failure_keeps_hub_fail_closed(self):
+        session = self.valid_session()
+        self.assertEqual("passed", prepare_session(session).overall)
+        original_write_sync_status = lesson_package._write_sync_status
+
+        def fail_unsynced(context, status):
+            if status == "unsynced":
+                raise OSError("forced marker failure")
+            return original_write_sync_status(context, status)
+
+        with patch.object(
+            lesson_package,
+            "_write_and_validate_stage",
+            side_effect=ValueError("forced-html-sync-failure"),
+        ), patch.object(
+            lesson_package, "_write_sync_status", side_effect=fail_unsynced
+        ):
+            report = sync_session(session)
+
+        self.assertEqual("failed", report.overall)
+        self.assertTrue(
+            any(error.startswith("sync-status-update-failed:") for error in report.errors),
+            report.errors,
+        )
+        hub = (session / "index.html").read_text(encoding="utf-8")
+        self.assertIn("Unsynced changes: sync required", hub)
+        self.assertNotIn("Unsynced changes: none", hub)
 
     def test_reverting_to_historical_bytes_creates_v3_from_active_version(self):
         session = self.valid_session()
@@ -293,7 +580,19 @@ class LessonPackageTest(unittest.TestCase):
             report = sync_session(session)
 
         self.assertEqual("failed", report.overall)
-        self.assertEqual(before, self.snapshot(session))
+        after = self.snapshot(session)
+        for mutable_sync_file in (".lesson-sync.json", "artifacts.md", "index.html"):
+            before.pop(mutable_sync_file)
+            after.pop(mutable_sync_file)
+        self.assertEqual(before, after)
+        self.assertEqual(
+            "unsynced",
+            json.loads((session / ".lesson-sync.json").read_text(encoding="utf-8"))["status"],
+        )
+        self.assertIn(
+            "Unsynced changes: sync required",
+            (session / "index.html").read_text(encoding="utf-8"),
+        )
 
     def test_rollback_preserves_foreign_collision_created_after_preflight(self):
         session = self.valid_session()
@@ -352,7 +651,19 @@ class LessonPackageTest(unittest.TestCase):
 
         self.assertEqual("failed", report.overall)
         self.assertFalse(partial.exists())
-        self.assertEqual(before, self.snapshot(session))
+        after = self.snapshot(session)
+        for mutable_sync_file in (".lesson-sync.json", "artifacts.md", "index.html"):
+            before.pop(mutable_sync_file)
+            after.pop(mutable_sync_file)
+        self.assertEqual(before, after)
+        self.assertEqual(
+            "unsynced",
+            json.loads((session / ".lesson-sync.json").read_text(encoding="utf-8"))["status"],
+        )
+        self.assertIn(
+            "Unsynced changes: sync required",
+            (session / "index.html").read_text(encoding="utf-8"),
+        )
 
     def test_current_deck_manifest_rejects_stale_history_until_new_definition_syncs(self):
         session = self.valid_session(decks=2)

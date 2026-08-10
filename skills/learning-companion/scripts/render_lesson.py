@@ -10,10 +10,12 @@ from string import Template
 from typing import Any, Callable, Mapping
 
 from lesson_model import RELATIONAL_TYPES, slugify
-from validate_lesson_html import HUB_ACTIVE_STATUSES, HUB_ALLOWED_STATUSES, HUB_REFRESH_BODY
+from validate_lesson_html import HUB_REFRESH_BODY
 
 
 TEMPLATES = Path(__file__).resolve().parent.parent / "templates"
+HUB_LIFECYCLE_STATUSES = frozenset({"awaiting-voice", "studying", "closed"})
+HUB_SYNC_STATUSES = frozenset({"synced", "unsynced"})
 
 
 @dataclass(frozen=True)
@@ -281,15 +283,45 @@ def _render_svg_edge(
     positions: Mapping[str, tuple[int, int]],
     node_identifiers: Mapping[str, str],
     marker_id: str,
+    section_type: str,
 ) -> str:
-    start_x, start_y, end_x, end_y = _edge_points(positions[edge["from"]], positions[edge["to"]])
+    source_position = positions[edge["from"]]
+    target_position = positions[edge["to"]]
+    start_x, start_y, end_x, end_y = _edge_points(source_position, target_position)
+    path_points = ((start_x, start_y), (end_x, end_y))
+    if section_type in {"flow", "timeline"}:
+        ordered_ids = sorted(positions, key=lambda node_id: positions[node_id][0])
+        source_index = ordered_ids.index(edge["from"])
+        target_index = ordered_ids.index(edge["to"])
+        if abs(target_index - source_index) > 1:
+            source_x, source_y = source_position
+            target_x, target_y = target_position
+            start_x = source_x + NODE_WIDTH // 2
+            start_y = source_y
+            end_x = target_x + NODE_WIDTH // 2
+            end_y = target_y
+            lane_y = min(source_y, target_y) - NODE_GAP
+            path_points = (
+                (start_x, start_y),
+                (start_x, lane_y),
+                (end_x, lane_y),
+                (end_x, end_y),
+            )
+    path_data = " ".join(
+        f'{"M" if index == 0 else "L"} {x} {y}'
+        for index, (x, y) in enumerate(path_points)
+    )
     label = edge.get("label", "")
     label_markup = ""
     if label:
         label_width = _edge_label_width(label)
         label_height = 28
-        center_x = (start_x + end_x) // 2
-        center_y = (start_y + end_y) // 2
+        if len(path_points) > 2:
+            center_x = (path_points[1][0] + path_points[2][0]) // 2
+            center_y = (path_points[1][1] + path_points[2][1]) // 2
+        else:
+            center_x = (start_x + end_x) // 2
+            center_y = (start_y + end_y) // 2
         label_markup = (
             f'<g class="diagram-edge-label-group" transform="translate({center_x} {center_y})">'
             f'<rect class="diagram-edge-label-backplate" x="{-label_width // 2}" '
@@ -299,7 +331,7 @@ def _render_svg_edge(
     return (
         f'<path class="diagram-edge" data-edge-from="{node_identifiers[edge["from"]]}" '
         f'data-edge-to="{node_identifiers[edge["to"]]}" marker-end="url(#{marker_id})" '
-        f'd="M {start_x} {start_y} L {end_x} {end_y}"></path>'
+        f'd="{path_data}"></path>'
         f'{label_markup}'
     )
 
@@ -372,7 +404,8 @@ def render_relation(section: Mapping[str, Any]) -> str:
         '</marker></defs>'
     )
     svg_edges = "".join(
-        _render_svg_edge(edge, positions, node_identifiers, marker_id) for edge in edges
+        _render_svg_edge(edge, positions, node_identifiers, marker_id, section_type)
+        for edge in edges
     )
     svg_nodes = "".join(
         _render_svg_node(node, node_identifiers[node["id"]], positions[node["id"]])
@@ -541,8 +574,8 @@ def _hub_artifacts(artifacts: tuple[Mapping[str, Any], ...]) -> tuple[dict[str, 
     return tuple(sorted(records, key=lambda item: (int(item["order"]), str(item["path"]), str(item["id"]))))
 
 
-def _legacy_hub_artifacts(model: Mapping[str, Any], decks: tuple[Mapping[str, Any], ...]) -> tuple[dict[str, object], ...]:
-    """Adapt the Task 5 deck call without widening package ownership."""
+def hub_artifacts_for_model(model: Mapping[str, Any], decks: tuple[Mapping[str, Any], ...]) -> tuple[dict[str, object], ...]:
+    """Project canonical sections and decks into deterministic hub entries."""
     artifacts: list[dict[str, object]] = []
     for index, section in enumerate(model.get("sections", ()), start=1):
         section_type = str(section.get("type", ""))
@@ -564,10 +597,16 @@ def _legacy_hub_artifacts(model: Mapping[str, Any], decks: tuple[Mapping[str, An
 
 
 def _render_hub_html(
-    model: Mapping[str, Any], artifacts: tuple[Mapping[str, Any], ...], status: str, theme_css: str
+    model: Mapping[str, Any],
+    artifacts: tuple[Mapping[str, Any], ...],
+    status: str,
+    theme_css: str,
+    sync_status: str,
 ) -> str:
-    if not isinstance(status, str) or status not in HUB_ALLOWED_STATUSES:
+    if not isinstance(status, str) or status not in HUB_LIFECYCLE_STATUSES:
         raise ValueError("hub status must be an allowlisted lifecycle state")
+    if not isinstance(sync_status, str) or sync_status not in HUB_SYNC_STATUSES:
+        raise ValueError("hub sync status must be synced or unsynced")
     session = model["session"]
     records = _hub_artifacts(artifacts)
     outline = "".join(
@@ -583,15 +622,15 @@ def _render_hub_html(
     )
     payload = _safe_json({
         "artifacts": records, "sessionId": session["id"], "status": status,
-        "topic": session["topic"],
+        "syncStatus": sync_status, "topic": session["topic"],
     })
-    refresh_script = f'<script id="lesson-refresh" data-contract="v1">{HUB_REFRESH_BODY}</script>' if status in HUB_ACTIVE_STATUSES else ""
+    refresh_script = f'<script id="lesson-refresh" data-contract="v1">{HUB_REFRESH_BODY}</script>' if status in {"awaiting-voice", "studying"} else ""
     body = (
         '<main class="hub-page"><header class="hub-header"><p class="eyebrow">Guided timeline</p>'
         f'<h1>{_text(session["topic"])}</h1><dl class="hub-meta"><div><dt>Day</dt><dd>Day {int(session["day"]):02d}</dd></div>'
         f'<div><dt>Mode</dt><dd>{_text(session["mode"])}</dd></div><div><dt>Depth</dt><dd>{_text(session["depth"])}</dd></div>'
         f'<div><dt>Status</dt><dd>{_text(status)}</dd></div></dl>'
-        f'<p class="hub-question">{_text(model["question"])}</p><p class="hub-sync-state">Unsynced changes: {"sync required" if status == "unsynced" else "none"}</p></header>'
+        f'<p class="hub-question">{_text(model["question"])}</p><p class="hub-sync-state" data-sync-status="{sync_status}">Unsynced changes: {"sync required" if sync_status == "unsynced" else "none"}</p></header>'
         '<div class="hub-layout"><nav class="turn-outline" aria-label="Turn outline"><h2>Turn outline</h2><ol>'
         f'{outline}</ol></nav><section class="timeline" aria-label="Chronological lesson cards">{cards}</section></div></main>'
     )
@@ -603,12 +642,11 @@ def _render_hub_html(
 
 
 def render_hub(
-    model: Mapping[str, Any], artifacts: tuple[Mapping[str, Any], ...], status: str, theme_css: str | bool
-) -> str | RenderedArtifact:
-    """Render the guided hub; preserve the Task 5 deck/refresh call as an adapter."""
-    if isinstance(theme_css, bool):
-        legacy_html = _render_hub_html(
-            model, _legacy_hub_artifacts(model, artifacts), "studying" if theme_css else "closed", status
-        )
-        return RenderedArtifact("hub", str(model["session"]["topic"]), "hub", "index.html", legacy_html, ())
-    return _render_hub_html(model, artifacts, status, theme_css)
+    model: Mapping[str, Any],
+    artifacts: tuple[Mapping[str, Any], ...],
+    status: str,
+    theme_css: str,
+    sync_status: str = "synced",
+) -> str:
+    """Render the guided hub from an explicit lifecycle state."""
+    return _render_hub_html(model, artifacts, status, theme_css, sync_status)

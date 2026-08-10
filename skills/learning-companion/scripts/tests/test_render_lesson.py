@@ -9,7 +9,7 @@ import unittest
 SCRIPT_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(SCRIPT_DIR))
 
-from lesson_model import load_lesson_model
+from lesson_model import load_lesson_model, validate_lesson_model
 from validate_lesson_html import validate_html
 
 try:
@@ -71,9 +71,11 @@ class RenderLessonTest(unittest.TestCase):
             report = validate_html(path, artifact.required_terms, artifact.profile)
         self.assertEqual("passed", report["overall"], report["errors"])
 
-    def render_hub_html(self, status, model=BASE_MODEL, artifacts=HUB_ARTIFACTS):
+    def render_hub_html(
+        self, status, model=BASE_MODEL, artifacts=HUB_ARTIFACTS, sync_status="synced"
+    ):
         self.assertIsNotNone(render_hub, "the lesson hub renderer must exist")
-        return render_hub(model, artifacts, status, self.theme_css())
+        return render_hub(model, artifacts, status, self.theme_css(), sync_status)
 
     def test_active_hub_uses_allowlisted_refresh_and_timeline_layout(self):
         html = self.render_hub_html("studying")
@@ -93,13 +95,21 @@ class RenderLessonTest(unittest.TestCase):
             report = validate_html(path, ("企业 AI 系统分层",), "hub")
         self.assertEqual("passed", report["overall"], report["errors"])
 
-    def test_awaiting_voice_and_unsynced_hubs_refresh_but_closed_hub_keeps_links(self):
-        for status in HUB_ACTIVE_STATUSES:
+    def test_lifecycle_and_sync_status_are_independent_hub_fields(self):
+        for status in ("awaiting-voice", "studying"):
             with self.subTest(status=status):
                 self.assertIn('id="lesson-refresh"', self.render_hub_html(status))
         closed = self.render_hub_html("closed")
         self.assertNotIn('id="lesson-refresh"', closed)
         self.assertIn("visuals/001-responsibility-map.html", closed)
+
+        unsynced = self.render_hub_html("studying", sync_status="unsynced")
+        self.assertIn('"status":"studying"', unsynced)
+        self.assertIn('"syncStatus":"unsynced"', unsynced)
+        self.assertIn("Unsynced changes: sync required", unsynced)
+        self.assertNotIn("Unsynced changes: none", unsynced)
+        with self.assertRaisesRegex(ValueError, "hub status"):
+            self.render_hub_html("unsynced")
 
     def test_hub_renderer_rejects_unknown_or_whitespace_variant_statuses(self):
         for status in ("unknown", "closed ", " studying"):
@@ -335,6 +345,87 @@ class RenderLessonTest(unittest.TestCase):
         duplicate["edges"].append({"from": "first", "to": "second", "label": "Repeat"})
         with self.assertRaisesRegex(ValueError, "duplicate"):
             render_relation(duplicate)
+
+    def test_canonical_validator_and_renderer_reject_the_same_relation_failures(self):
+        flow = next(item for item in BASE_MODEL["sections"] if item["type"] == "flow")
+        cases = (
+            ("empty edges", lambda section: section.update(edges=[])),
+            (
+                "self loop",
+                lambda section: section["edges"].append(
+                    {"from": "model", "to": "model", "label": "loop"}
+                ),
+            ),
+            (
+                "duplicate",
+                lambda section: section["edges"].append(copy.deepcopy(section["edges"][0])),
+            ),
+            (
+                "disconnected",
+                lambda section: section["nodes"].append(
+                    {"id": "orphan", "label": "Orphan", "kind": "risk"}
+                ),
+            ),
+        )
+        for name, mutate in cases:
+            with self.subTest(name=name):
+                model = copy.deepcopy(BASE_MODEL)
+                section = next(item for item in model["sections"] if item["id"] == flow["id"])
+                mutate(section)
+                self.assertTrue(validate_lesson_model(model))
+                with self.assertRaises(ValueError):
+                    render_relation(section)
+
+    def test_nonadjacent_flow_connector_routes_around_intermediate_node(self):
+        section = {
+            "id": "routed-flow",
+            "type": "flow",
+            "title": "Routed flow",
+            "summary": "A nonadjacent connector must not cross the middle node.",
+            "nodes": [
+                {"id": "first", "label": "First", "kind": "neutral"},
+                {"id": "middle", "label": "Middle", "kind": "active"},
+                {"id": "last", "label": "Last", "kind": "gate"},
+            ],
+            "edges": [
+                {"from": "first", "to": "middle", "label": "Adjacent"},
+                {"from": "first", "to": "last", "label": "Skip"},
+            ],
+        }
+
+        html = render_relation(section)
+
+        routed = re.search(
+            r'data-edge-from="node-0" data-edge-to="node-2"[^>]+d="([^"]+)"', html
+        )
+        self.assertIsNotNone(routed)
+        points = [
+            tuple(map(int, point))
+            for point in re.findall(r"(?:M|L) (-?\d+) (-?\d+)", routed.group(1))
+        ]
+        self.assertGreaterEqual(len(points), 4, routed.group(1))
+        middle_left, middle_top = map(
+            int,
+            re.search(
+                r'data-node-id="node-1" transform="translate\((\d+) (\d+)\)"', html
+            ).groups(),
+        )
+        for (start_x, start_y), (end_x, end_y) in zip(points, points[1:]):
+            if start_x == end_x:
+                crosses = (
+                    middle_left < start_x < middle_left + 200
+                    and min(start_y, end_y) < middle_top + 96
+                    and max(start_y, end_y) > middle_top
+                )
+            elif start_y == end_y:
+                crosses = (
+                    middle_top < start_y < middle_top + 96
+                    and min(start_x, end_x) < middle_left + 200
+                    and max(start_x, end_x) > middle_left
+                )
+            else:
+                self.fail(f"connector segment is not orthogonal: {routed.group(1)}")
+            self.assertFalse(crosses, (routed.group(1), (middle_left, middle_top)))
 
     def test_relation_geometry_never_overlaps_for_supported_node_counts(self):
         for section_type in ("flow", "timeline", "layer-map", "boundary-map"):

@@ -26,11 +26,12 @@ COMPONENT_TYPES = frozenset(
     }
 )
 RELATIONAL_TYPES = frozenset({"layer-map", "boundary-map", "flow", "timeline"})
-SESSION_MODES = frozenset({"text", "voice", "hybrid"})
-SESSION_DEPTHS = frozenset({"shallow", "medium", "deep"})
+SESSION_MODES = frozenset({"text", "voice"})
+SESSION_DEPTHS = frozenset({"light", "medium", "deep"})
 SESSION_STATUSES = frozenset(
-    {"preparing", "ready", "in-progress", "completed", "archived"}
+    {"preparing", "awaiting-voice", "studying", "closed", "error"}
 )
+RESERVED_ARTIFACT_LOGICAL_IDS = frozenset({"hub"})
 MODEL_KEYS = frozenset(
     {"schemaVersion", "session", "theme", "question", "requiredTerms", "decks", "sections"}
 )
@@ -90,6 +91,7 @@ def validate_lesson_model(data: Mapping[str, Any]) -> tuple[ValidationIssue, ...
     section_ids = _validate_sections(data.get("sections"), issues)
     if "decks" in data:
         _validate_decks(data["decks"], section_ids, issues)
+    _validate_artifact_identities(data, issues)
     return tuple(issues)
 
 
@@ -196,8 +198,8 @@ def _validate_relations(
     elif not isinstance(section["nodes"], list):
         issues.append(ValidationIssue("nodes-invalid", f"{path}.nodes", "expected a list"))
         node_ids = set()
-    elif relational and not section["nodes"]:
-        issues.append(ValidationIssue("nodes-empty", f"{path}.nodes", "expected at least one node"))
+    elif relational and len(section["nodes"]) < 2:
+        issues.append(ValidationIssue("nodes-empty", f"{path}.nodes", "expected at least two nodes"))
         node_ids = set()
     else:
         node_ids = set()
@@ -264,11 +266,17 @@ def _validate_relations(
 
     if "edges" not in section:
         if relational:
-            issues.append(ValidationIssue("edges-invalid", f"{path}.edges", "expected a list"))
+            issues.append(ValidationIssue("edges-empty", f"{path}.edges", "expected at least one edge"))
         return
     if not isinstance(section["edges"], list):
         issues.append(ValidationIssue("edges-invalid", f"{path}.edges", "expected a list"))
         return
+    if relational and not section["edges"]:
+        issues.append(ValidationIssue("edges-empty", f"{path}.edges", "expected at least one edge"))
+
+    pairs: set[tuple[str, str]] = set()
+    adjacency = {node_id: set() for node_id in node_ids}
+    participating: set[str] = set()
     for edge_index, edge in enumerate(section["edges"]):
         edge_path = f"{path}.edges[{edge_index}]"
         if not isinstance(edge, Mapping):
@@ -289,8 +297,49 @@ def _validate_relations(
             issues.append(
                 ValidationIssue("edge-target-missing", edge_path, "missing target")
             )
+        if isinstance(source, str) and isinstance(target, str) and source in node_ids and target in node_ids:
+            if source == target:
+                issues.append(
+                    ValidationIssue("edge-self-loop", edge_path, "self-loops are forbidden")
+                )
+            else:
+                pair = (source, target)
+                if pair in pairs:
+                    issues.append(
+                        ValidationIssue("edge-duplicate", edge_path, "duplicate edge")
+                    )
+                else:
+                    pairs.add(pair)
+                participating.update((source, target))
+                adjacency[source].add(target)
+                adjacency[target].add(source)
         if "label" in edge and not isinstance(edge["label"], str):
             issues.append(ValidationIssue("edge-label-invalid", f"{edge_path}.label", "expected a string"))
+
+    if relational and node_ids:
+        for node_id in sorted(node_ids - participating):
+            issues.append(
+                ValidationIssue(
+                    "relation-node-unreferenced",
+                    f"{path}.nodes",
+                    f"node is not used by an edge: {node_id}",
+                )
+            )
+        pending = [min(node_ids)]
+        reachable: set[str] = set()
+        while pending:
+            node_id = pending.pop()
+            if node_id not in reachable:
+                reachable.add(node_id)
+                pending.extend(adjacency[node_id] - reachable)
+        if reachable != node_ids:
+            issues.append(
+                ValidationIssue(
+                    "relation-disconnected",
+                    f"{path}.edges",
+                    "expected one connected graph using every node",
+                )
+            )
 
 
 def _validate_decks(
@@ -327,6 +376,114 @@ def _validate_decks(
                 issues.append(
                     ValidationIssue("deck-section-missing", section_path, "section does not exist")
                 )
+
+
+def _validate_artifact_identities(
+    data: Mapping[str, Any], issues: list[ValidationIssue]
+) -> None:
+    """Reject renderer output identities that would alias another artifact."""
+    identities: list[tuple[str, str, str, str]] = [("hub", "hub", "index.html", "$")]
+    sections = data.get("sections")
+    valid_sections = (
+        tuple(section for section in sections if isinstance(section, Mapping))
+        if isinstance(sections, list)
+        else ()
+    )
+    by_id = {
+        section["id"]: section
+        for section in valid_sections
+        if isinstance(section.get("id"), str) and section["id"].strip()
+    }
+    for index, section in enumerate(valid_sections):
+        section_id = section.get("id")
+        if not isinstance(section_id, str) or not section_id.strip():
+            continue
+        if section_id in RESERVED_ARTIFACT_LOGICAL_IDS:
+            issues.append(
+                ValidationIssue(
+                    "artifact-logical-id-reserved",
+                    f"sections[{index}].id",
+                    "logical ID is reserved by the package runtime",
+                )
+            )
+        section_slug = slugify(section_id)
+        if not section_slug:
+            issues.append(
+                ValidationIssue(
+                    "artifact-path-invalid",
+                    f"sections[{index}].id",
+                    "ID must produce a nonempty artifact path",
+                )
+            )
+            continue
+        identities.append(
+            (section_id, "card", f"cards/{section_slug}.html", f"sections[{index}].id")
+        )
+
+    declared_decks = data.get("decks")
+    if isinstance(declared_decks, list) and declared_decks:
+        decks = tuple(deck for deck in declared_decks if isinstance(deck, Mapping))
+    else:
+        decks = (
+            {
+                "id": "main",
+                "sectionIds": [section_id for section_id in by_id],
+            },
+        )
+    for deck_index, deck in enumerate(decks, start=1):
+        deck_id = deck.get("id")
+        if not isinstance(deck_id, str) or not deck_id.strip():
+            continue
+        deck_slug = slugify(deck_id) or f"deck-{deck_index}"
+        deck_root = f"decks/{deck_index:03d}-{deck_slug}"
+        deck_logical_id = f"deck-{deck_index:03d}-{deck_slug}"
+        deck_path = f"decks[{deck_index - 1}].id"
+        identities.append((deck_logical_id, "deck", f"{deck_root}/index.html", deck_path))
+        section_ids = deck.get("sectionIds")
+        if not isinstance(section_ids, list):
+            continue
+        for slide_index, section_id in enumerate(section_ids, start=1):
+            if not isinstance(section_id, str) or section_id not in by_id:
+                continue
+            section_slug = slugify(section_id)
+            if not section_slug:
+                continue
+            identities.append(
+                (
+                    f"slide-{deck_index:03d}-{deck_slug}-{slide_index:03d}-{section_slug}",
+                    "slide",
+                    f"{deck_root}/slides/{slide_index:03d}-{section_slug}.html",
+                    f"decks[{deck_index - 1}].sectionIds[{slide_index - 1}]",
+                )
+            )
+
+    logical_ids: dict[str, tuple[str, str]] = {}
+    paths: dict[str, tuple[str, str]] = {}
+    for logical_id, artifact_type, output_path, source_path in identities:
+        prior_logical = logical_ids.get(logical_id)
+        identity = (artifact_type, output_path)
+        if prior_logical is not None and prior_logical != identity:
+            issues.append(
+                ValidationIssue(
+                    "artifact-logical-id-conflict",
+                    source_path,
+                    f"logical ID aliases {prior_logical[0]} at {prior_logical[1]}",
+                )
+            )
+        else:
+            logical_ids[logical_id] = identity
+        prior_path = paths.get(output_path)
+        path_identity = (logical_id, artifact_type)
+        if prior_path is not None and prior_path != path_identity:
+            issues.append(
+                ValidationIssue(
+                    "artifact-path-conflict",
+                    source_path,
+                    f"output path aliases {prior_path[1]} {prior_path[0]}",
+                )
+            )
+        else:
+            paths[output_path] = path_identity
 
 
 def _validate_nonempty_string(

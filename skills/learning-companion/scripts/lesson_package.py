@@ -31,26 +31,22 @@ from lesson_model import (
     slugify,
     validate_lesson_model,
 )
-from render_lesson import RenderedArtifact, render_deck, render_hub, render_section
+from render_lesson import (
+    RenderedArtifact,
+    hub_artifacts_for_model,
+    render_deck,
+    render_hub,
+    render_section,
+)
 from validate_lesson_html import PROFILES, validate_html
 
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 THEME = ASSETS / "lesson-theme.css"
 LEDGER = "artifacts.md"
+SYNC_MARKER = ".lesson-sync.json"
+SYNC_FORMAT = "learning-companion.lesson-sync.v1"
 FROZEN_MARKER = ".artifacts-frozen"
-LIFECYCLE_STATUSES = frozenset(
-    {
-        "preparing",
-        "ready",
-        "in-progress",
-        "completed",
-        "archived",
-        "studying",
-        "awaiting-voice",
-        "closed",
-    }
-)
 LEDGER_FIELDS = (
     "id",
     "logicalId",
@@ -69,6 +65,9 @@ LEDGER_FIELDS = (
 )
 LEDGER_FORMAT = "learning-companion.artifact-ledger.v1"
 ARTIFACT_TYPES = frozenset({"hub", "card", "deck", "slide"})
+SYNC_STATUSES = frozenset({"synced", "unsynced"})
+TURN_MARKER_PREFIX = "<!-- lesson-turn-id:"
+TURN_ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _LOCAL_LOCK_GUARD = Lock()
 _LOCAL_SESSION_LOCKS: dict[str, Lock] = {}
 
@@ -101,6 +100,7 @@ class ArtifactSpec:
     profile: str
     relative_path: str
     html: str
+    source_turn: str
     source_refs: tuple[str, ...]
     required_terms: tuple[str, ...]
     mutable_index: bool = False
@@ -165,43 +165,52 @@ def _safe_path(context: SessionContext, target: Path | str) -> Path:
 
 
 @contextmanager
-def _session_lock(context: SessionContext):
-    """Serialize lifecycle mutations in-process and across cooperating processes."""
+def _process_session_lock(context: SessionContext):
+    """Serialize same-process access without touching the lesson package."""
     key = str(context.session)
     with _LOCAL_LOCK_GUARD:
         lock = _LOCAL_SESSION_LOCKS.setdefault(key, Lock())
     lock.acquire()
-    descriptor: int | None = None
     try:
-        lock_path = _safe_path(context, ".lesson-session.lock")
-        descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR)
-        if os.name == "nt":
-            import msvcrt
-
-            if os.fstat(descriptor).st_size == 0:
-                os.write(descriptor, b"0")
-            os.lseek(descriptor, 0, os.SEEK_SET)
-            msvcrt.locking(descriptor, msvcrt.LK_LOCK, 1)
-        else:
-            import fcntl
-
-            fcntl.flock(descriptor, fcntl.LOCK_EX)
         yield
     finally:
-        if descriptor is not None:
-            try:
-                if os.name == "nt":
-                    import msvcrt
-
-                    os.lseek(descriptor, 0, os.SEEK_SET)
-                    msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
-                else:
-                    import fcntl
-
-                    fcntl.flock(descriptor, fcntl.LOCK_UN)
-            finally:
-                os.close(descriptor)
         lock.release()
+
+
+@contextmanager
+def _session_lock(context: SessionContext):
+    """Serialize lifecycle mutations in-process and across cooperating processes."""
+    descriptor: int | None = None
+    with _process_session_lock(context):
+        try:
+            lock_path = _safe_path(context, ".lesson-session.lock")
+            descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR)
+            if os.name == "nt":
+                import msvcrt
+
+                if os.fstat(descriptor).st_size == 0:
+                    os.write(descriptor, b"0")
+                os.lseek(descriptor, 0, os.SEEK_SET)
+                msvcrt.locking(descriptor, msvcrt.LK_LOCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(descriptor, fcntl.LOCK_EX)
+            yield
+        finally:
+            if descriptor is not None:
+                try:
+                    if os.name == "nt":
+                        import msvcrt
+
+                        os.lseek(descriptor, 0, os.SEEK_SET)
+                        msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+                    else:
+                        import fcntl
+
+                        fcntl.flock(descriptor, fcntl.LOCK_UN)
+                finally:
+                    os.close(descriptor)
 
 
 def assert_within(target: Path, root: Path) -> Path:
@@ -256,6 +265,7 @@ def allocate_session(
     context = session_context(session_dir)
     _write_lesson_skeleton(context, plan_root.name, day, topic, mode, depth)
     _atomic_write_text(context, LEDGER, _serialize_ledger(()))
+    _write_sync_status(context, "synced")
     return session_dir
 
 
@@ -276,7 +286,15 @@ def sync_session(session_dir: Path) -> PackageReport:
         with _session_lock(context):
             if _safe_path(context, FROZEN_MARKER).exists():
                 return _failed(_lesson_status(context), "artifacts-frozen")
-            return _package_session(context, action="sync")
+            report = _package_session(context, action="sync")
+            if report.overall == "failed":
+                marker_errors = _mark_sync_required(context)
+                if marker_errors:
+                    return replace(
+                        report,
+                        errors=tuple(dict.fromkeys((*report.errors, *marker_errors))),
+                    )
+            return report
     except ValueError as exc:
         return _failed("preparing", str(exc))
 
@@ -293,11 +311,52 @@ def close_session(session_dir: Path) -> PackageReport:
         return _failed("preparing", str(exc))
 
 
+def takeover_voice_session(session_dir: Path) -> PackageReport:
+    """Record an observed native Voice takeover without rebuilding artifacts."""
+    try:
+        context = session_context(session_dir)
+        with _session_lock(context):
+            prior_status = _lesson_status(context)
+            model, model_errors = _load_valid_model(context)
+            if model_errors:
+                return _failed(prior_status, *model_errors)
+            model_status = model["session"]["status"]
+            if model_status != prior_status:
+                return _failed(
+                    prior_status,
+                    f"lifecycle-status-mismatch:{prior_status}:{model_status}",
+                )
+            if prior_status != "awaiting-voice":
+                return _failed(prior_status, "voice-takeover-requires-awaiting-voice")
+            if model["session"]["mode"] != "voice":
+                return _failed(prior_status, "voice-takeover-requires-voice-mode")
+            validation = _validate_session(context)
+            if validation.overall != "passed":
+                return validation
+            model_path = _safe_path(context, "lesson-model.json")
+            lesson_path = _safe_path(context, "lesson.md")
+            snapshots = {
+                model_path: model_path.read_bytes(),
+                lesson_path: lesson_path.read_bytes(),
+            }
+            try:
+                _write_lifecycle_status(context, model, "studying")
+            except Exception:
+                for path, raw in snapshots.items():
+                    _atomic_write_bytes(context, path, raw)
+                raise
+            return PackageReport(
+                "passed", "studying", (), validation.artifacts, validation.topic
+            )
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return _failed("preparing", f"package-error:{exc}")
+
+
 def validate_session(session_dir: Path) -> PackageReport:
     """Validate every ledger artifact, global term evidence, and source authority."""
     try:
         context = session_context(session_dir)
-        with _session_lock(context):
+        with _process_session_lock(context):
             return _validate_session(context)
     except ValueError as exc:
         return _failed("preparing", str(exc))
@@ -310,11 +369,16 @@ def _validate_session(context: SessionContext) -> PackageReport:
     model, model_errors = _load_valid_model(context)
     if model_errors:
         return _failed(status, *model_errors)
+    turn_ids, turn_errors = _lesson_turn_ids(_safe_path(context, "lesson.md"))
     records, ledger_errors = _read_ledger(context)
-    errors = list(ledger_errors)
+    errors = [*turn_errors, *ledger_errors]
+    sync_status, sync_errors = _read_sync_status(context)
+    errors.extend(sync_errors)
+    if sync_status == "unsynced":
+        errors.append("lesson-sync-required")
     if not records:
         errors.append("artifact-ledger-empty")
-    errors.extend(_minimum_package_errors(records, model))
+    errors.extend(_minimum_package_errors(records, model, turn_ids))
     allowed_sources = _authorized_sources(context, model)
     artifact_text: list[str] = []
     for record in records:
@@ -340,6 +404,10 @@ def _validate_session(context: SessionContext) -> PackageReport:
         for source_ref in record.source_refs:
             if source_ref not in allowed_sources:
                 errors.append(f"source-reference-unauthorized:{source_ref}")
+        if record.source_turn not in turn_ids:
+            errors.append(
+                f"artifact-source-turn-unknown:{record.artifact_id}:{record.source_turn}"
+            )
     errors.extend(_global_term_errors(model, artifact_text))
     return _report("failed" if errors else "passed", status, errors, records, model)
 
@@ -366,22 +434,38 @@ def _package_session(context: SessionContext, action: str) -> PackageReport:
     model, model_errors = _load_valid_model(context)
     if model_errors:
         return _failed(prior_status, *model_errors)
+    model_status = model["session"]["status"]
+    if model_status != prior_status:
+        return _failed(
+            prior_status, f"lifecycle-status-mismatch:{prior_status}:{model_status}"
+        )
     if action == "prepare" and prior_status != "preparing":
         return _failed(prior_status, "prepare-requires-preparing-status")
     if action not in {"prepare", "sync", "close"}:
         return _failed(prior_status, f"unknown-package-action:{action}")
+    turn_ids, turn_errors = _lesson_turn_ids(_safe_path(context, "lesson.md"))
+    turn_errors = (*turn_errors, *_turn_contract_errors(model, turn_ids))
+    if turn_errors:
+        return _failed(prior_status, *turn_errors)
 
     records, ledger_errors = _read_ledger(context)
     if ledger_errors:
         return _failed(prior_status, *ledger_errors)
-    desired_status = "closed" if action == "close" else _active_status(model)
-    refresh = action != "close"
+    if action == "prepare":
+        desired_status = _prepared_status(model)
+    elif action == "close":
+        desired_status = "closed"
+    else:
+        desired_status = prior_status
     stage = _safe_path(context, f".lesson-stage-{uuid4().hex}")
     try:
         stage.mkdir()
-        specs, build_errors = _build_artifacts(model, refresh)
+        specs, build_errors = _build_artifacts(model, desired_status, turn_ids)
         if build_errors:
             return _failed(prior_status, *build_errors)
+        identity_errors = _artifact_spec_identity_errors(specs)
+        if identity_errors:
+            return _failed(prior_status, *identity_errors)
         staged = _write_and_validate_stage(context, stage, specs)
         gate_errors = _package_gate_errors(context, model, specs, staged)
         if gate_errors:
@@ -451,15 +535,11 @@ def _load_valid_model(context: SessionContext) -> tuple[dict[str, Any], tuple[st
         model = load_lesson_model(model_path)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return {}, (f"lesson-model-load-failed:{exc}",)
-    normalized = copy.deepcopy(model)
-    session_model = normalized.get("session")
-    if isinstance(session_model, dict) and session_model.get("status") in LIFECYCLE_STATUSES:
-        session_model["status"] = "preparing"
-    issues = validate_lesson_model(normalized)
+    issues = validate_lesson_model(model)
     return model, tuple(f"model-invalid:{issue.code}:{issue.path}" for issue in issues)
 
 
-def _active_status(model: Mapping[str, Any]) -> str:
+def _prepared_status(model: Mapping[str, Any]) -> str:
     return "awaiting-voice" if model["session"]["mode"] == "voice" else "studying"
 
 
@@ -470,22 +550,49 @@ def _theme_css() -> str:
 
 
 def _build_artifacts(
-    model: Mapping[str, Any], refresh: bool
+    model: Mapping[str, Any], status: str, turn_ids: tuple[str, ...]
 ) -> tuple[tuple[ArtifactSpec, ...], tuple[str, ...]]:
     try:
         theme_css = _theme_css()
         sections = tuple(model["sections"])
         by_id = {section["id"]: section for section in sections}
+        turn_by_section = {
+            section["id"]: turn_id for section, turn_id in zip(sections, turn_ids)
+        }
+        if len(turn_by_section) != len(sections):
+            raise ValueError("lesson-turn-count-insufficient")
         decks = _deck_definitions(model, sections)
         specs: list[ArtifactSpec] = []
         all_sources = _unique_sources(
             source for section in sections for source in section.get("sourceRefs", ())
         )
-        hub = render_hub(model, decks, theme_css, refresh)
-        specs.append(_artifact_spec(hub, "hub", all_sources, mutable_index=True))
+        hub_html = render_hub(
+            model, hub_artifacts_for_model(model, decks), status, theme_css, "synced"
+        )
+        specs.append(
+            ArtifactSpec(
+                logical_id="hub",
+                title=str(model["session"]["topic"]),
+                artifact_type="hub",
+                profile="hub",
+                relative_path="index.html",
+                html=hub_html,
+                source_turn=turn_ids[0],
+                source_refs=all_sources,
+                required_terms=(),
+                mutable_index=True,
+            )
+        )
         for section in sections:
             card = render_section(model, section, theme_css)
-            specs.append(_artifact_spec(card, "card", tuple(section["sourceRefs"])))
+            specs.append(
+                _artifact_spec(
+                    card,
+                    "card",
+                    tuple(section["sourceRefs"]),
+                    source_turn=turn_by_section[section["id"]],
+                )
+            )
         for deck_number, deck in enumerate(decks, start=1):
             deck_id = slugify(str(deck["id"])) or f"deck-{deck_number}"
             deck_root = f"decks/{deck_number:03d}-{deck_id}"
@@ -501,6 +608,7 @@ def _build_artifacts(
                     deck_artifact,
                     "deck",
                     deck_sources,
+                    source_turn=turn_by_section[deck["sectionIds"][0]],
                     logical_id=f"deck-{deck_number:03d}-{deck_id}",
                     mutable_index=True,
                 )
@@ -515,7 +623,12 @@ def _build_artifacts(
                     ),
                 )
                 specs.append(
-                    _artifact_spec(slide, "slide", tuple(section["sourceRefs"]))
+                    _artifact_spec(
+                        slide,
+                        "slide",
+                        tuple(section["sourceRefs"]),
+                        source_turn=turn_by_section[section["id"]],
+                    )
                 )
         return tuple(specs), ()
     except (KeyError, TypeError, ValueError) as exc:
@@ -541,6 +654,7 @@ def _artifact_spec(
     artifact: RenderedArtifact,
     artifact_type: str,
     source_refs: tuple[str, ...],
+    source_turn: str,
     logical_id: str | None = None,
     mutable_index: bool = False,
 ) -> ArtifactSpec:
@@ -551,6 +665,7 @@ def _artifact_spec(
         profile=artifact.profile,
         relative_path=artifact.relative_path,
         html=artifact.html,
+        source_turn=source_turn,
         source_refs=source_refs,
         required_terms=artifact.required_terms,
         mutable_index=mutable_index,
@@ -560,8 +675,12 @@ def _artifact_spec(
 def _write_and_validate_stage(
     context: SessionContext, stage: Path, specs: Iterable[ArtifactSpec]
 ) -> dict[str, Path]:
+    items = tuple(specs)
+    identity_errors = _artifact_spec_identity_errors(items)
+    if identity_errors:
+        raise ValueError(identity_errors[0])
     staged: dict[str, Path] = {}
-    for spec in specs:
+    for spec in items:
         target = _safe_path(context, stage / spec.relative_path)
         target.parent.mkdir(parents=True, exist_ok=True)
         _atomic_write_text(context, target, spec.html)
@@ -571,6 +690,34 @@ def _write_and_validate_stage(
             raise ValueError(f"artifact-invalid:{spec.logical_id}:{rendered}")
         staged[spec.logical_id] = target
     return staged
+
+
+def _artifact_spec_identity_errors(
+    specs: Iterable[ArtifactSpec],
+) -> tuple[str, ...]:
+    """Require a bijection between logical IDs, types, and output paths."""
+    logical_ids: dict[str, tuple[str, str]] = {}
+    paths: dict[str, tuple[str, str]] = {}
+    errors: list[str] = []
+    for spec in specs:
+        identity = (spec.artifact_type, spec.relative_path)
+        prior_identity = logical_ids.get(spec.logical_id)
+        if prior_identity is not None:
+            code = (
+                "artifact-spec-duplicate"
+                if prior_identity == identity
+                else "artifact-spec-logical-id-conflict"
+            )
+            errors.append(f"{code}:{spec.logical_id}")
+        else:
+            logical_ids[spec.logical_id] = identity
+        path_identity = (spec.logical_id, spec.artifact_type)
+        prior_path_identity = paths.get(spec.relative_path)
+        if prior_path_identity is not None and prior_path_identity != path_identity:
+            errors.append(f"artifact-spec-path-conflict:{spec.relative_path}")
+        else:
+            paths[spec.relative_path] = path_identity
+    return tuple(dict.fromkeys(errors))
 
 
 def _package_gate_errors(
@@ -613,9 +760,15 @@ def _minimum_package_errors_from_specs(
     return tuple(errors)
 
 
-def _minimum_package_errors(records: Iterable[LedgerRecord], model: Mapping[str, Any]) -> tuple[str, ...]:
+def _minimum_package_errors(
+    records: Iterable[LedgerRecord],
+    model: Mapping[str, Any],
+    turn_ids: tuple[str, ...],
+) -> tuple[str, ...]:
     history = tuple(records)
-    expected, build_errors = _build_artifacts(model, refresh=True)
+    expected, build_errors = _build_artifacts(
+        model, str(model["session"]["status"]), turn_ids
+    )
     if build_errors:
         return build_errors
     errors = list(_minimum_package_errors_from_specs(expected, model))
@@ -678,6 +831,44 @@ def _lesson_sources(lesson_path: Path) -> tuple[str, ...]:
     return tuple(sources)
 
 
+def _lesson_turn_ids(lesson_path: Path) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Extract ordered, unique turn records from exact lesson Markdown markers."""
+    if not lesson_path.is_file():
+        return (), ("lesson-markdown-missing",)
+    lines = lesson_path.read_text(encoding="utf-8").splitlines()
+    turn_ids: list[str] = []
+    errors: list[str] = []
+    for index, line in enumerate(lines):
+        if not line.startswith(TURN_MARKER_PREFIX):
+            continue
+        match = re.fullmatch(r"<!-- lesson-turn-id: ([a-z0-9]+(?:-[a-z0-9]+)*) -->", line)
+        if match is None:
+            errors.append("lesson-turn-marker-invalid")
+            continue
+        turn_id = match.group(1)
+        if not TURN_ID_PATTERN.fullmatch(turn_id):
+            errors.append("lesson-turn-marker-invalid")
+            continue
+        if turn_id in turn_ids:
+            errors.append(f"lesson-turn-id-duplicate:{turn_id}")
+        else:
+            turn_ids.append(turn_id)
+        if index + 1 >= len(lines) or not re.match(r"^##\s+\S", lines[index + 1]):
+            errors.append(f"lesson-turn-heading-missing:{turn_id}")
+    if not turn_ids and not errors:
+        errors.append("lesson-turn-records-missing")
+    return tuple(turn_ids), tuple(dict.fromkeys(errors))
+
+
+def _turn_contract_errors(
+    model: Mapping[str, Any], turn_ids: tuple[str, ...]
+) -> tuple[str, ...]:
+    sections = model.get("sections")
+    if isinstance(sections, list) and len(turn_ids) < len(sections):
+        return ("lesson-turn-count-insufficient",)
+    return ()
+
+
 def _commit_package(
     context: SessionContext,
     specs: tuple[ArtifactSpec, ...],
@@ -688,6 +879,11 @@ def _commit_package(
     action: str,
 ) -> tuple[LedgerRecord, ...]:
     """Preflight and commit a package as one rollback-capable transaction."""
+    identity_errors = _artifact_spec_identity_errors(specs)
+    if identity_errors:
+        raise ValueError(identity_errors[0])
+    if set(staged) != {spec.logical_id for spec in specs}:
+        raise ValueError("artifact-stage-identity-mismatch")
     records = list(existing)
     timestamp = _deterministic_timestamp()
     writes: list[tuple[bool, Path, bytes]] = []
@@ -743,6 +939,7 @@ def _commit_package(
         _safe_path(context, LEDGER),
         _safe_path(context, "lesson-model.json"),
         _safe_path(context, "lesson.md"),
+        _safe_path(context, SYNC_MARKER),
         _safe_path(context, FROZEN_MARKER),
     ]
     for mutable, target, _ in writes:
@@ -763,6 +960,7 @@ def _commit_package(
                 created.append((target, _sha256(raw)))
         _atomic_write_text(context, LEDGER, _serialize_ledger(records))
         _write_lifecycle_status(context, model, desired_status)
+        _write_sync_status(context, "synced")
         if action == "close":
             _atomic_write_text(context, FROZEN_MARKER, "frozen\n")
     except Exception:
@@ -822,7 +1020,7 @@ def _new_record(
         artifact_type=spec.artifact_type,
         title=spec.title,
         profile=spec.profile,
-        source_turn="lesson-model.json",
+        source_turn=spec.source_turn,
         source_refs=spec.source_refs,
         version=version,
         status="visual verification pending",
@@ -847,6 +1045,102 @@ def _write_lifecycle_status(
     mutable_model["session"]["status"] = status
     atomic_write_json(context, Path("lesson-model.json"), mutable_model)
     set_lesson_frontmatter_status(context, Path("lesson.md"), status)
+
+
+def _write_sync_status(context: SessionContext, status: str) -> None:
+    if status not in SYNC_STATUSES:
+        raise ValueError(f"invalid lesson sync status: {status}")
+    atomic_write_json(
+        context,
+        Path(SYNC_MARKER),
+        {"format": SYNC_FORMAT, "status": status},
+    )
+
+
+def _read_sync_status(context: SessionContext) -> tuple[str, tuple[str, ...]]:
+    path = _safe_path(context, SYNC_MARKER)
+    if not path.is_file():
+        return "", ("lesson-sync-marker-missing",)
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return "", ("lesson-sync-marker-malformed",)
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"format", "status"}
+        or value.get("format") != SYNC_FORMAT
+        or value.get("status") not in SYNC_STATUSES
+    ):
+        return "", ("lesson-sync-marker-invalid",)
+    return str(value["status"]), ()
+
+
+def _mark_sync_required(context: SessionContext) -> tuple[str, ...]:
+    """Keep the last valid hub navigable while making a failed sync explicit."""
+    records, ledger_errors = _read_ledger(context)
+    if ledger_errors:
+        return tuple(f"sync-status-update-failed:{error}" for error in ledger_errors)
+    hub_records = [
+        record
+        for record in records
+        if record.logical_id == "hub"
+        and record.artifact_type == "hub"
+        and record.relative_path == "index.html"
+    ]
+    if not hub_records:
+        try:
+            _write_sync_status(context, "unsynced")
+        except (OSError, ValueError) as exc:
+            return (f"sync-status-update-failed:{exc}",)
+        return ()
+    hub_record = max(hub_records, key=lambda record: record.version)
+    hub_path = _safe_path(context, hub_record.relative_path)
+    try:
+        if not hub_path.is_file() or _sha256(hub_path.read_bytes()) != hub_record.sha256:
+            raise ValueError("last-valid-hub-unavailable")
+        hub_text = hub_path.read_text(encoding="utf-8")
+        updated = hub_text.replace(
+            'data-sync-status="synced">Unsynced changes: none',
+            'data-sync-status="unsynced">Unsynced changes: sync required',
+            1,
+        ).replace('"syncStatus":"synced"', '"syncStatus":"unsynced"', 1)
+        if updated == hub_text or "Unsynced changes: none" in updated:
+            raise ValueError("last-valid-hub-sync-marker-missing")
+        staged = _safe_path(context, f".lesson-unsynced-{uuid4().hex}.html")
+        try:
+            _atomic_write_text(context, staged, updated)
+            validation = validate_html(staged, (), "hub")
+            if validation["overall"] != "passed":
+                raise ValueError(
+                    f"last-valid-hub-invalid:{','.join(validation['errors'])}"
+                )
+            raw = staged.read_bytes()
+        finally:
+            if staged.exists():
+                staged.unlink()
+        _atomic_write_bytes(context, hub_path, raw)
+        replacement = replace(
+            hub_record,
+            sha256=_sha256(raw),
+            updated_at=_deterministic_timestamp(),
+        )
+        updated_records = list(records)
+        updated_records[updated_records.index(hub_record)] = replacement
+        _atomic_write_text(context, LEDGER, _serialize_ledger(updated_records))
+    except (OSError, ValueError) as exc:
+        try:
+            _write_sync_status(context, "unsynced")
+        except (OSError, ValueError) as marker_exc:
+            return (
+                f"sync-status-update-failed:{exc}",
+                f"sync-status-update-failed:{marker_exc}",
+            )
+        return (f"sync-status-update-failed:{exc}",)
+    try:
+        _write_sync_status(context, "unsynced")
+    except (OSError, ValueError) as exc:
+        return (f"sync-status-update-failed:{exc}",)
+    return ()
 
 
 def _read_ledger(context: SessionContext) -> tuple[tuple[LedgerRecord, ...], tuple[str, ...]]:
@@ -914,6 +1208,27 @@ def _read_ledger(context: SessionContext) -> tuple[tuple[LedgerRecord, ...], tup
         paths.add(record.relative_path)
         logical_versions.add(key)
         records.append(record)
+    by_logical_id: dict[str, list[LedgerRecord]] = {}
+    for record in records:
+        by_logical_id.setdefault(record.logical_id, []).append(record)
+    for logical_id, history in by_logical_id.items():
+        ordered = sorted(history, key=lambda record: record.version)
+        versions = [record.version for record in ordered]
+        if versions != list(range(1, len(ordered) + 1)):
+            errors.append(f"artifact-ledger-version-gap:{logical_id}")
+        by_version = {record.version: record for record in ordered}
+        for record in ordered:
+            if record.version == 1:
+                if record.supersedes:
+                    errors.append(
+                        f"artifact-ledger-v1-supersedes:{record.artifact_id}"
+                    )
+                continue
+            previous = by_version.get(record.version - 1)
+            if previous is None or record.supersedes != previous.artifact_id:
+                errors.append(
+                    f"artifact-ledger-supersedes-invalid:{record.artifact_id}"
+                )
     return tuple(records), tuple(errors)
 
 
@@ -1056,7 +1371,7 @@ def _parser() -> argparse.ArgumentParser:
     allocate.add_argument("--mode", required=True, choices=sorted(SESSION_MODES))
     allocate.add_argument("--depth", required=True, choices=sorted(SESSION_DEPTHS))
     allocate.add_argument("--date", required=True, type=_parse_date)
-    for command in ("prepare", "sync", "validate", "close"):
+    for command in ("prepare", "sync", "validate", "close", "takeover"):
         child = commands.add_parser(command)
         child.add_argument("session_dir", type=Path)
     return parser
@@ -1078,6 +1393,7 @@ def main(argv: list[str] | None = None) -> int:
                 "sync": sync_session,
                 "validate": validate_session,
                 "close": close_session,
+                "takeover": takeover_voice_session,
             }[args.command]
             report = operation(args.session_dir)
             payload = report.to_dict()

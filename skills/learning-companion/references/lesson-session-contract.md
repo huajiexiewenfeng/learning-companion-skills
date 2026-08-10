@@ -18,34 +18,42 @@ somewhere under the plan's `lessons` directory). Existing symlink parents are
 resolved before use and cannot redirect a write into another session.
 
 Allocation creates `lesson.md` in `preparing` state and an empty
-`artifacts.md` ledger. Add a valid `lesson-model.json` before preparing.
+`artifacts.md` ledger. It also creates `.lesson-sync.json` with independent
+status `synced`. Add a valid `lesson-model.json` and lesson turn records before
+preparing.
 
 ## Lifecycle
 
 ```python
 prepare_session(session_dir) -> PackageReport
 sync_session(session_dir) -> PackageReport
+takeover_voice_session(session_dir) -> PackageReport
 validate_session(session_dir) -> PackageReport
 close_session(session_dir) -> PackageReport
 ```
 
-`prepare` requires both `lesson.md` and `lesson-model.json`. It renders into a
+`prepare` requires both `lesson.md` and `lesson-model.json`, and their exact
+lifecycle statuses must match. It renders into a
 UUID-named session-local staging directory and promotes nothing until every
-gate passes. A text or hybrid session becomes `studying`; a voice session
+gate passes. A text session becomes `studying`; a voice session
 becomes `awaiting-voice`. The teaching layer may transition `awaiting-voice` to
-`studying` only after observable host evidence that a new native Voice task has
-taken over the prepared session. A failed prepare remains `preparing` and has
-no final artifact promotion.
+`studying` only by calling `takeover_voice_session` after observable host
+evidence that a new native Voice task has taken over the prepared session. The
+only takeover transition is `awaiting-voice -> studying`; repeated or
+out-of-state calls fail closed. Later `sync` operations preserve the stored
+`studying` state instead of deriving state from mode. A failed prepare remains
+`preparing` and has no final artifact promotion.
 
 An `awaiting-voice` session is immutable mode history for later routing. A
 fresh text request after an abandoned Voice handoff allocates and prepares a
 new text-mode session; it must not reuse, reclassify, or promote the Voice
 session into `studying`.
 
-`prepare`, `sync`, `validate`, and `close` hold an exclusive per-session lock.
-They re-read the model, lifecycle state, and ledger only after acquiring that
-lock. This serializes concurrent callers, preventing lost records, orphaned
-versions, and incorrect `supersedes` links.
+Mutating operations (`prepare`, `sync`, `takeover`, and `close`) hold an
+exclusive per-session file lock. They re-read the model, lifecycle state, and
+ledger only after acquiring that lock. Public `validate` is observationally
+read-only: it uses only the in-process guard and never creates or modifies
+`.lesson-session.lock`.
 
 The package minimum is:
 
@@ -66,6 +74,15 @@ and so on, and name the replaced record in `supersedes`. Hub and deck index
 navigation are mutable indexes and may update their original paths in place.
 Before reuse, the final file must exist, match the ledger SHA-256, and still
 pass its declared HTML profile; a tampered immutable artifact fails closed.
+
+Lifecycle and sync state are independent. `.lesson-sync.json` contains exactly
+`format` (`learning-companion.lesson-sync.v1`) and `status` (`synced` or
+`unsynced`). A successful package commit writes `synced`. If Markdown/model
+changes exist but HTML sync fails, lifecycle remains unchanged, the last valid
+hub and its ledger digest are updated to show `Unsynced changes: sync required`,
+and the marker becomes `unsynced`. If the marker write itself fails, the hub is
+left in the fail-closed `sync required` form and the operation reports the
+marker failure; it never claims that the artifact is synchronized.
 
 Promotion preflights every version destination before final writes. The ledger,
 lifecycle files, and mutable indexes are snapshotted before commit. Any later
@@ -109,6 +126,28 @@ model, so preserved historical deck records never satisfy a changed definition.
 The only valid record types are `hub`, `card`, `deck`, and `slide`; unknown
 types are a malformed ledger, never an extensibility fallback.
 
+`sourceTurn` is an actual teaching turn ID declared in `lesson.md`, never a
+filename. A turn record is exactly an HTML comment immediately followed by a
+level-two Markdown heading:
+
+```markdown
+<!-- lesson-turn-id: turn-001 -->
+## First teaching turn
+```
+
+Turn IDs use lowercase ASCII letters, digits, and single hyphen-separated
+segments, are unique, and remain in teaching order. The first N turn records
+bind to the N canonical sections; cards and slides use their section's turn,
+while aggregate hub/deck records use the first contributing section turn.
+Validation requires every ledger `sourceTurn` to resolve to one of these
+records.
+
+For every logical artifact, ledger versions start at 1 and increase without
+gaps. Version 1 has an empty `supersedes`; every later version points exactly
+to version N-1 of the same logical artifact. The target must exist, so broken
+or cross-artifact chains fail validation. Superseded immutable HTML remains on
+disk.
+
 Timestamps are deterministic: the default is `1970-01-01T00:00:00Z`; setting
 an integer `SOURCE_DATE_EPOCH` uses that UTC instant instead. This makes
 package fixtures and byte-level checks reproducible.
@@ -119,6 +158,7 @@ package fixtures and byte-level checks reproducible.
 lesson_package.py allocate PLAN --day N --topic TEXT --mode text --depth medium --date YYYY-MM-DD
 lesson_package.py prepare SESSION
 lesson_package.py sync SESSION
+lesson_package.py takeover SESSION
 lesson_package.py validate SESSION
 lesson_package.py close SESSION
 ```

@@ -13,6 +13,15 @@ from lesson_model import load_lesson_model, required_terms, slugify, validate_le
 
 FIXTURES = Path(__file__).parent / "fixtures"
 SCHEMA = SCRIPT_DIR.parent / "references" / "lesson-model.schema.json"
+REPOSITORY_ROOT = SCRIPT_DIR.parents[2]
+GOLDEN_MODEL = (
+    REPOSITORY_ROOT
+    / "examples"
+    / "technical-learning"
+    / "lessons"
+    / "day-01-system-layers"
+    / "lesson-model.json"
+)
 
 
 class LessonModelTest(unittest.TestCase):
@@ -139,6 +148,108 @@ class LessonModelTest(unittest.TestCase):
                 model = self.valid_model()
                 mutate(model)
                 self.assertIn(expected_code, self.issue_codes(model))
+
+    def test_runtime_session_enums_match_the_lifecycle_contract(self):
+        schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+        session_properties = schema["properties"]["session"]["properties"]
+        expected = {
+            "mode": {"text", "voice"},
+            "depth": {"light", "medium", "deep"},
+            "status": {"preparing", "awaiting-voice", "studying", "closed", "error"},
+        }
+        for field, allowed in expected.items():
+            with self.subTest(field=field):
+                self.assertEqual(allowed, set(session_properties[field]["enum"]))
+                for value in allowed:
+                    model = self.valid_model()
+                    model["session"][field] = value
+                    self.assertNotIn(f"session-{field}", self.issue_codes(model))
+
+        rejected = {"mode": "hybrid", "depth": "shallow", "status": "completed"}
+        for field, value in rejected.items():
+            with self.subTest(field=field, value=value):
+                model = self.valid_model()
+                model["session"][field] = value
+                self.assertIn(f"session-{field}", self.issue_codes(model))
+
+    def test_closed_golden_model_is_canonically_valid_without_normalization(self):
+        self.assertTrue(GOLDEN_MODEL.is_file())
+        self.assertEqual((), validate_lesson_model(load_lesson_model(GOLDEN_MODEL)))
+
+    def test_reserved_and_cross_type_artifact_identities_are_rejected(self):
+        reserved = self.valid_model()
+        reserved["sections"][0]["id"] = "hub"
+        self.assertIn("artifact-logical-id-reserved", self.issue_codes(reserved))
+
+        path_collision = self.valid_model()
+        duplicate = copy.deepcopy(path_collision["sections"][0])
+        duplicate["id"] = "Core Concept"
+        path_collision["sections"].append(duplicate)
+        self.assertIn("artifact-path-conflict", self.issue_codes(path_collision))
+
+        logical_collision = self.valid_model()
+        duplicate = copy.deepcopy(logical_collision["sections"][0])
+        duplicate["id"] = "deck-001-system-layers"
+        logical_collision["sections"].append(duplicate)
+        self.assertIn("artifact-logical-id-conflict", self.issue_codes(logical_collision))
+
+        slide_collision = self.valid_model()
+        duplicate = copy.deepcopy(slide_collision["sections"][0])
+        duplicate["id"] = "slide-001-system-layers-001-core-concept"
+        slide_collision["sections"].append(duplicate)
+        self.assertIn("artifact-logical-id-conflict", self.issue_codes(slide_collision))
+
+    def test_relational_invariants_match_renderer_preconditions(self):
+        flow_index = next(
+            index
+            for index, section in enumerate(self.valid_model()["sections"])
+            if section["type"] == "flow"
+        )
+        cases = (
+            (
+                "empty edges",
+                lambda section: section.update(edges=[]),
+                "edges-empty",
+            ),
+            (
+                "self loop",
+                lambda section: section["edges"].append(
+                    {"from": "model", "to": "model", "label": "loop"}
+                ),
+                "edge-self-loop",
+            ),
+            (
+                "duplicate edge",
+                lambda section: section["edges"].append(copy.deepcopy(section["edges"][0])),
+                "edge-duplicate",
+            ),
+            (
+                "unreferenced node",
+                lambda section: section["nodes"].append(
+                    {"id": "orphan", "label": "Orphan", "kind": "risk"}
+                ),
+                "relation-node-unreferenced",
+            ),
+        )
+        for name, mutate, expected_code in cases:
+            with self.subTest(name=name):
+                model = self.valid_model()
+                mutate(model["sections"][flow_index])
+                self.assertIn(expected_code, self.issue_codes(model))
+
+    def test_schema_requires_nonempty_relational_nodes_and_edges(self):
+        schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+        relational_rules = [
+            rule
+            for rule in schema["$defs"]["section"]["allOf"]
+            if set(rule.get("if", {}).get("properties", {}).get("type", {}).get("enum", ()))
+            == {"layer-map", "boundary-map", "flow", "timeline"}
+        ]
+        self.assertEqual(1, len(relational_rules))
+        rule = relational_rules[0]["then"]
+        self.assertEqual({"nodes", "edges"}, set(rule["required"]))
+        self.assertGreaterEqual(rule["properties"]["nodes"]["minItems"], 2)
+        self.assertGreaterEqual(rule["properties"]["edges"]["minItems"], 1)
 
     def test_decks_are_optional_but_not_nullable(self):
         model_without_decks = self.valid_model()
