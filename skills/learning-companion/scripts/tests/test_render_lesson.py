@@ -40,6 +40,8 @@ except ImportError:
 FIXTURES = Path(__file__).parent / "fixtures"
 ASSETS = SCRIPT_DIR.parent / "assets"
 THEME = ASSETS / "lesson-theme.css"
+REPOSITORY_ROOT = SCRIPT_DIR.parents[2]
+GOLDEN_MODEL = REPOSITORY_ROOT / "examples" / "technical-learning" / "lessons" / "day-01-system-layers" / "lesson-model.json"
 BASE_MODEL = load_lesson_model(FIXTURES / "valid-lesson-model.json")
 HUB_ARTIFACTS = (
     {"id": "answer", "type": "answer", "title": "Answer", "summary": "State the answer.", "path": "cards/007-answer.html", "order": 7},
@@ -183,6 +185,87 @@ class RenderLessonTest(unittest.TestCase):
         html = self.render(BASE_MODEL, section).html
         self.assertLess(html.index("核对"), html.index("执行"))
         self.assertLess(html.index("执行"), html.index("验收"))
+
+    def test_theme_gives_boundary_diagrams_semantic_visible_paint_in_each_color_scheme(self):
+        css = self.theme_css()
+        self.assertIn(
+            ".diagram-boundary { fill: var(--color-panel); stroke: var(--color-line); stroke-width: 1.5; }",
+            css,
+        )
+        self.assertIn(
+            ".diagram-boundary-label { fill: var(--color-ink); font-family: system-ui, sans-serif; font-size: 14px; font-weight: 750; }",
+            css,
+        )
+        dark_mode = css.split("@media (prefers-color-scheme: dark)", 1)[1]
+        self.assertIn(
+            ".diagram-boundary { fill: var(--color-panel); stroke: var(--color-line); }",
+            dark_mode,
+        )
+        self.assertIn(".diagram-boundary-label { fill: var(--color-ink); }", dark_mode)
+
+    def test_theme_uses_one_relationship_representation_per_viewport_and_restores_svg_for_print(self):
+        css = self.theme_css()
+        self.assertIn(".desktop-diagram { display: block; }", css)
+        self.assertIn(".mobile-semantic-flow { display: none; }", css)
+        narrow = css.split("@media (max-width: 720px)", 1)[1].split("@media (prefers-color-scheme: dark)", 1)[0]
+        self.assertIn(".desktop-diagram { display: none; }", narrow)
+        self.assertIn(".technical-visual .desktop-diagram { display: none; }", narrow)
+        self.assertIn(".mobile-semantic-flow { display: grid; }", narrow)
+        printed = css.split("@media print", 1)[1]
+        self.assertIn(".desktop-diagram { display: block; }", printed)
+        self.assertIn(".technical-visual .desktop-diagram { display: block; }", printed)
+        self.assertIn(".mobile-semantic-flow { display: none; }", printed)
+
+    def test_theme_uses_a_panel_backplate_and_centered_edge_labels(self):
+        css = self.theme_css()
+        self.assertIn(
+            ".diagram-edge-label-backplate { fill: var(--color-panel); stroke: none; }",
+            css,
+        )
+        self.assertIn(
+            ".diagram-edge-label { fill: var(--color-ink); font-family: system-ui, sans-serif; font-size: 14px; font-weight: 750; text-anchor: middle; paint-order: stroke fill; stroke: var(--color-panel); stroke-width: 6px; stroke-linejoin: round; }",
+            css,
+        )
+
+    def test_golden_responsibility_map_and_delivery_flow_keep_label_backplates_outside_nodes(self):
+        self.assertTrue(GOLDEN_MODEL.is_file(), "the Day 1 golden model must be available")
+        model = load_lesson_model(GOLDEN_MODEL)
+        for section_id in ("responsibility-map", "reliable-delivery-flow"):
+            with self.subTest(section_id=section_id):
+                section = next(item for item in model["sections"] if item["id"] == section_id)
+                html = render_relation(section)
+                nodes = [
+                    tuple(map(int, position))
+                    for position in re.findall(
+                        r'<g class="diagram-node [^"]+" data-node-id="node-\d+" '
+                        r'transform="translate\((\d+) (\d+)\)">',
+                        html,
+                    )
+                ]
+                labels = [
+                    tuple(map(int, geometry))
+                    for geometry in re.findall(
+                        r'<g class="diagram-edge-label-group" transform="translate\((\d+) (\d+)\)">'
+                        r'<rect class="diagram-edge-label-backplate" x="(-?\d+)" y="(-?\d+)" '
+                        r'width="(\d+)" height="(\d+)" rx="8"></rect>',
+                        html,
+                    )
+                ]
+                self.assertEqual(len(section["edges"]), len(labels))
+                for center_x, center_y, offset_x, offset_y, width, height in labels:
+                    label_left = center_x + offset_x
+                    label_top = center_y + offset_y
+                    for node_left, node_top in nodes:
+                        overlaps = (
+                            label_left < node_left + 200
+                            and label_left + width > node_left
+                            and label_top < node_top + 96
+                            and label_top + height > node_top
+                        )
+                        self.assertFalse(
+                            overlaps,
+                            (section_id, (label_left, label_top, width, height), (node_left, node_top)),
+                        )
 
     def test_relation_geometry_is_type_specific_and_stable(self):
         expected = {

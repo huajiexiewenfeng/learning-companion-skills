@@ -10,14 +10,13 @@
       "profile": "hub",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        ".superpowers/sdd/task-9-brief.md#Task-9",
-        "skills/learning-companion/references/lesson-session-contract.md#Ledger-and-timestamps",
-        "skills/learning-companion/references/voice-teaching.md#Teaching-Turns",
-        "skills/learning-companion/references/lesson-artifact-contract.md#Visual-review-gate"
+        "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK",
+        "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS",
+        "evidence.md#E3-LIFECYCLE-AND-ARTIFACT-CONTROLS"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "fdb231ac824c0d9fa05579488bfa315195d1b333792d10c541f72a74fabcf5f1",
+      "sha256": "65ee3d6b91cf2b50c065e61f453ccf9146e3aeaec34121ebe803536b11f3afca",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -31,11 +30,11 @@
       "profile": "document",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        ".superpowers/sdd/task-9-brief.md#Task-9"
+        "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "446ed3a656338f81550a09dd086a5299e84f469025c4531f9cc0395d77dca710",
+      "sha256": "6d591b706255d00a35f669468becbee39dbdc72a16d0477625c8bd4617efaab7",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -49,11 +48,11 @@
       "profile": "technical-visual",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        ".superpowers/sdd/task-9-brief.md#Task-9"
+        "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "778b781ee95209ad0458bb2c664ae8b969c38bc1e92a52379792604ddfbf02c8",
+      "sha256": "4b880d90eb36c9e0d6624b3322e12c64535f6624d268e97cd08a6f4535568e2a",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -67,11 +66,11 @@
       "profile": "technical-visual",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        ".superpowers/sdd/task-9-brief.md#Task-9"
+        "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "9f06e4847b1dfa8c4bc0763b8c8aabde8ccc295aba0a3af59335fcce28401f5e",
+      "sha256": "f06a7f8832d26cde21bf5c031269eb62286f9fed2dd05eb71dd68e3c8940f032",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -85,11 +84,11 @@
       "profile": "technical-visual",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        ".superpowers/sdd/task-9-brief.md#Task-9"
+        "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "1917039f8cf3f89b74c7bf51988d434586b6126e611f9138280c52cd29e1b5c4",
+      "sha256": "1580f266c3128b15fe53e487df0bec76b01785acb178ae16ddbb2a969b386f8a",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -103,11 +102,11 @@
       "profile": "document",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        "skills/learning-companion/references/lesson-session-contract.md#Ledger-and-timestamps"
+        "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "b25f3965b3ce843820846700d05c32b7bae46ae1e53f383e54fee50cbec2ffe7",
+      "sha256": "8990a7de97eaa209c6958403974dfe793597b074ea2f650d08b91fc48088c8ef",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -117,15 +116,15 @@
       "logicalId": "project-develop-copilot-case",
       "path": "cards/project-develop-copilot-case.html",
       "type": "card",
-      "title": "Project Develop Copilot：长对话压缩后的执行漂移",
+      "title": "Project Develop Copilot：长对话压缩症状的说明性复合案例",
       "profile": "document",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        ".superpowers/sdd/task-9-brief.md#Task-9"
+        "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "b5ecab0ced69c7dfc99edad272a0cb1d580477e3f89eeb2d551a9503d8b0ce03",
+      "sha256": "b32acc130ca599a8a7ee05fbf4a2265705a94e4eade44e22cb5cfd2ec1810b0f",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -139,11 +138,12 @@
       "profile": "document",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        ".superpowers/sdd/task-9-brief.md#Task-9"
+        "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK",
+        "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "f08eed1bfdc8d7ee1a1e16028eb401aca5e92bca849ec9ad27b58e5d99e24e39",
+      "sha256": "41dde7a8f272d91c6a110ea5c2317c000a732a2025aa92f0249366386dfe4274",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -157,11 +157,11 @@
       "profile": "document",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        "skills/learning-companion/references/voice-teaching.md#Teaching-Turns"
+        "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "623bf5f920b90d1a1ef4f968ed52763213d161f328669d24d9301ecb27a10896",
+      "sha256": "d7dd2b6dff9e9f7c542ddc049c80b24884320f98e8699fff13cd281096609e09",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -175,12 +175,11 @@
       "profile": "document",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        "skills/learning-companion/references/lesson-artifact-contract.md#Visual-review-gate",
-        "skills/learning-companion/references/lesson-session-contract.md#Ledger-and-timestamps"
+        "evidence.md#E3-LIFECYCLE-AND-ARTIFACT-CONTROLS"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "479b85d385a438fcb3896ef1a062556d50b6764703e952c5dbbd005abb4fe95a",
+      "sha256": "fd48e0e087e1aa7b653d2380dea86e246b776f967e1c831d3d3411fea93b66c5",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -194,11 +193,11 @@
       "profile": "document",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        ".superpowers/sdd/task-9-brief.md#Task-9"
+        "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "e0ab84b079589e23f9e3778e38bbc2cfe49327634384ae4847623ce985991f68",
+      "sha256": "bf16e00ca8314128594347ba06c86fa8bf697c91c364dddf71475bd7076b947c",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -212,11 +211,11 @@
       "profile": "document",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        ".superpowers/sdd/task-9-brief.md#Task-9"
+        "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "446ed3a656338f81550a09dd086a5299e84f469025c4531f9cc0395d77dca710",
+      "sha256": "6d591b706255d00a35f669468becbee39dbdc72a16d0477625c8bd4617efaab7",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -230,11 +229,11 @@
       "profile": "technical-visual",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        ".superpowers/sdd/task-9-brief.md#Task-9"
+        "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "778b781ee95209ad0458bb2c664ae8b969c38bc1e92a52379792604ddfbf02c8",
+      "sha256": "4b880d90eb36c9e0d6624b3322e12c64535f6624d268e97cd08a6f4535568e2a",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -248,11 +247,11 @@
       "profile": "technical-visual",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        ".superpowers/sdd/task-9-brief.md#Task-9"
+        "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "9f06e4847b1dfa8c4bc0763b8c8aabde8ccc295aba0a3af59335fcce28401f5e",
+      "sha256": "f06a7f8832d26cde21bf5c031269eb62286f9fed2dd05eb71dd68e3c8940f032",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -266,14 +265,13 @@
       "profile": "document",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        ".superpowers/sdd/task-9-brief.md#Task-9",
-        "skills/learning-companion/references/lesson-session-contract.md#Ledger-and-timestamps",
-        "skills/learning-companion/references/voice-teaching.md#Teaching-Turns",
-        "skills/learning-companion/references/lesson-artifact-contract.md#Visual-review-gate"
+        "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK",
+        "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS",
+        "evidence.md#E3-LIFECYCLE-AND-ARTIFACT-CONTROLS"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "abb9231b8a74078a5ed09f416bf282d616509eb51c6944c31cc452400843ff66",
+      "sha256": "46d6721e69d32fcf0c4fbc80635af3bd4fa62b5c8b44ca86fac022c51f95d779",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -287,11 +285,11 @@
       "profile": "technical-visual",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        ".superpowers/sdd/task-9-brief.md#Task-9"
+        "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "1917039f8cf3f89b74c7bf51988d434586b6126e611f9138280c52cd29e1b5c4",
+      "sha256": "1580f266c3128b15fe53e487df0bec76b01785acb178ae16ddbb2a969b386f8a",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -305,11 +303,11 @@
       "profile": "document",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        "skills/learning-companion/references/lesson-session-contract.md#Ledger-and-timestamps"
+        "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "b25f3965b3ce843820846700d05c32b7bae46ae1e53f383e54fee50cbec2ffe7",
+      "sha256": "8990a7de97eaa209c6958403974dfe793597b074ea2f650d08b91fc48088c8ef",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -319,15 +317,15 @@
       "logicalId": "slide-002-reliable-delivery-003-project-develop-copilot-case",
       "path": "decks/002-reliable-delivery/slides/003-project-develop-copilot-case.html",
       "type": "slide",
-      "title": "Project Develop Copilot：长对话压缩后的执行漂移",
+      "title": "Project Develop Copilot：长对话压缩症状的说明性复合案例",
       "profile": "document",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        ".superpowers/sdd/task-9-brief.md#Task-9"
+        "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "b5ecab0ced69c7dfc99edad272a0cb1d580477e3f89eeb2d551a9503d8b0ce03",
+      "sha256": "b32acc130ca599a8a7ee05fbf4a2265705a94e4eade44e22cb5cfd2ec1810b0f",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -341,11 +339,12 @@
       "profile": "document",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        ".superpowers/sdd/task-9-brief.md#Task-9"
+        "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK",
+        "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "f08eed1bfdc8d7ee1a1e16028eb401aca5e92bca849ec9ad27b58e5d99e24e39",
+      "sha256": "41dde7a8f272d91c6a110ea5c2317c000a732a2025aa92f0249366386dfe4274",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -359,11 +358,11 @@
       "profile": "document",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        "skills/learning-companion/references/voice-teaching.md#Teaching-Turns"
+        "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "623bf5f920b90d1a1ef4f968ed52763213d161f328669d24d9301ecb27a10896",
+      "sha256": "d7dd2b6dff9e9f7c542ddc049c80b24884320f98e8699fff13cd281096609e09",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -377,12 +376,11 @@
       "profile": "document",
       "sourceTurn": "lesson-model.json",
       "sourceRefs": [
-        "skills/learning-companion/references/lesson-artifact-contract.md#Visual-review-gate",
-        "skills/learning-companion/references/lesson-session-contract.md#Ledger-and-timestamps"
+        "evidence.md#E3-LIFECYCLE-AND-ARTIFACT-CONTROLS"
       ],
       "version": 1,
       "status": "visual verification pending",
-      "sha256": "479b85d385a438fcb3896ef1a062556d50b6764703e952c5dbbd005abb4fe95a",
+      "sha256": "fd48e0e087e1aa7b653d2380dea86e246b776f967e1c831d3d3411fea93b66c5",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""

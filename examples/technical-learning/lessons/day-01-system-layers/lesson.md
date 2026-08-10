@@ -5,12 +5,11 @@ day: 1
 topic: "企业 AI 系统分层：从模型能力到可靠交付"
 mode: voice
 depth: deep
-status: awaiting-voice
+status: closed
 sources:
-  - .superpowers/sdd/task-9-brief.md#Task-9
-  - skills/learning-companion/references/lesson-session-contract.md#Lifecycle
-  - skills/learning-companion/references/lesson-artifact-contract.md#Visual-review-gate
-  - skills/learning-companion/references/voice-teaching.md#Native-Voice-Teaching-Protocol
+  - evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK
+  - evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS
+  - evidence.md#E3-LIFECYCLE-AND-ARTIFACT-CONTROLS
 ---
 
 # Day 1：企业 AI 系统分层
@@ -43,11 +42,11 @@ Archive 是历史证据的保管处，Memory 是帮助下一轮工作的信息�
 4. 执行受控操作，把结果写入 Authoritative State。
 5. 追加 Trace，并由负责人依据状态和证据验收可靠交付。
 
-## Project Develop Copilot 长对话压缩案例
+## Project Develop Copilot 说明性复合案例（非观测事故）
 
-一个长对话中的 Project Develop Copilot 已讨论了多个候选模块。为节省上下文，代理把会话压缩为一段 Memory；其中遗漏了“当前 active scope 仅限 A，B 仍是 candidate scope”和最近一次 Checkpoint 的待确认条件。恢复时，代理把压缩摘要误当作 Authoritative State，直接修改了 B：这就是执行漂移（execution drift）。
+这个 Project Develop Copilot 叙事是基于用户确认的长上下文症状所作的说明性复合案例，不是一次已观测事故。它用来讨论一种可能的失败序列：为节省上下文，代理把长对话压缩为一段 Memory；若压缩遗漏 active scope、candidate scope 或最近 Checkpoint 的条件，恢复后的代理就可能把摘要误当作 Authoritative State，并发生执行漂移（execution drift）。
 
-修复不是让 Memory 更长，而是回到 Archive 中的原始决策与来源，重新读取当前 Plan、active scope 和 Checkpoint，确认 Authoritative State 后再执行。每次范围选择、批准和写入都要进入 Trace，下一次恢复才能区分“已证实”与“只是被压缩过”。
+对应的控制不是让 Memory 更长，而是回到 Archive 中的原始决策与来源，重新读取当前 Plan、active scope 和 Checkpoint，确认 Authoritative State 后再执行。每次范围选择、批准和写入都要进入 Trace，下一次恢复才能区分“已证实”与“只是被压缩过”。
 
 ## 常见误区
 
@@ -59,7 +58,6 @@ Archive 是历史证据的保管处，Memory 是帮助下一轮工作的信息�
 
 ## 来源说明
 
-- `.superpowers/sdd/task-9-brief.md#Task-9`：本示例的验收主题与五层、责任图、可靠交付流、案例、误区和检查题要求。
-- `skills/learning-companion/references/lesson-session-contract.md#Lifecycle`：会话包、不可变 HTML 存档、版本与状态规则。
-- `skills/learning-companion/references/lesson-artifact-contract.md#Visual-review-gate`：离线 HTML、确定性验证及桌面与 390px 视觉复核门禁。
-- `skills/learning-companion/references/voice-teaching.md#Native-Voice-Teaching-Protocol`：原生 Voice 的可观察交接边界，以及 `下课` 前不推进 Effective progress 的规则。
+- `evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK`：课程定义的五层责任和 Archive / Memory / Authoritative State / Plan / Checkpoint / Trace 边界。
+- `evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS`：用户确认的长上下文压缩与执行漂移症状；Project Develop Copilot 仅作说明性复合案例。
+- `evidence.md#E3-LIFECYCLE-AND-ARTIFACT-CONTROLS`：会话包、离线 HTML 存档、确定性验证和独立视觉复核门禁。

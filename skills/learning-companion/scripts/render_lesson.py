@@ -102,17 +102,19 @@ NODE_COLOR_VARIABLES = {
 }
 
 
-def relation_positions(section_type: str, node_count: int) -> tuple[tuple[int, int], ...]:
+def relation_positions(
+    section_type: str, node_count: int, gap: int = NODE_GAP
+) -> tuple[tuple[int, int], ...]:
     """Return stable, type-specific positions within the fixed SVG view box."""
     if node_count < 1:
         raise ValueError("relational section requires at least one declared node")
 
     if section_type in {"flow", "timeline"}:
-        return tuple((40 + index * (NODE_WIDTH + NODE_GAP), 170) for index in range(node_count))
+        return tuple((40 + index * (NODE_WIDTH + gap), 170) for index in range(node_count))
     if section_type == "layer-map":
-        return tuple((330, 40 + index * (NODE_HEIGHT + NODE_GAP)) for index in range(node_count))
+        return tuple((330, 40 + index * (NODE_HEIGHT + gap)) for index in range(node_count))
     if section_type == "boundary-map":
-        return tuple((40, 100 + index * (NODE_HEIGHT + NODE_GAP)) for index in range(node_count))
+        return tuple((40, 100 + index * (NODE_HEIGHT + gap)) for index in range(node_count))
     raise ValueError(f"unsupported relational section type: {section_type}")
 
 
@@ -190,7 +192,7 @@ def _node_detail(node: Mapping[str, Any]) -> str:
 
 
 def _boundary_layout(
-    nodes: tuple[Mapping[str, Any], ...]
+    nodes: tuple[Mapping[str, Any], ...], gap: int = NODE_GAP
 ) -> tuple[dict[str, tuple[int, int]], str]:
     """Lay out factual declared groups without inferring a group from node index."""
     groups: dict[str, list[Mapping[str, Any]]] = {}
@@ -205,16 +207,16 @@ def _boundary_layout(
     positions: dict[str, tuple[int, int]] = {}
     markup: list[str] = ['<g class="diagram-boundaries">']
     for group_index, (group, group_nodes) in enumerate(groups.items()):
-        left = 20 + group_index * (NODE_WIDTH + NODE_GAP * 2)
+        left = 20 + group_index * (NODE_WIDTH + gap * 2)
         first_y = 100
-        height = len(group_nodes) * NODE_HEIGHT + (len(group_nodes) - 1) * NODE_GAP + 100
+        height = len(group_nodes) * NODE_HEIGHT + (len(group_nodes) - 1) * gap + 100
         markup.append(
             f'<g class="diagram-boundary-group"><rect class="diagram-boundary" x="{left}" y="40" '
             f'width="{NODE_WIDTH + NODE_GAP}" height="{height}" rx="20"></rect>'
             f'<text class="diagram-boundary-label" x="{left + 20}" y="72">{_text(group)}</text></g>'
         )
         for node_index, node in enumerate(group_nodes):
-            positions[node["id"]] = (left + 20, first_y + node_index * (NODE_HEIGHT + NODE_GAP))
+            positions[node["id"]] = (left + 20, first_y + node_index * (NODE_HEIGHT + gap))
     markup.append("</g>")
     return positions, "".join(markup)
 
@@ -236,6 +238,19 @@ def _edge_points(source: tuple[int, int], target: tuple[int, int]) -> tuple[int,
     if target_y >= source_y:
         return source_x + NODE_WIDTH // 2, source_y + NODE_HEIGHT, target_x + NODE_WIDTH // 2, target_y
     return source_x + NODE_WIDTH // 2, source_y, target_x + NODE_WIDTH // 2, target_y + NODE_HEIGHT
+
+
+def _edge_label_width(label: str) -> int:
+    """Estimate a deterministic, roomy SVG backplate width for visible edge text."""
+    units = sum(2 if ord(character) > 0x7F else 1 for character in label)
+    return max(72, min(260, units * 7 + 24))
+
+
+def _relation_gap(edges: tuple[Mapping[str, Any], ...]) -> int:
+    """Leave an actual connector gap wide enough for every declared edge label."""
+    labels = [edge.get("label", "") for edge in edges]
+    widths = [_edge_label_width(label) for label in labels if isinstance(label, str) and label]
+    return max(NODE_GAP, *(width + 24 for width in widths))
 
 
 def _render_svg_node(node: Mapping[str, Any], identifier: str, position: tuple[int, int]) -> str:
@@ -269,12 +284,23 @@ def _render_svg_edge(
 ) -> str:
     start_x, start_y, end_x, end_y = _edge_points(positions[edge["from"]], positions[edge["to"]])
     label = edge.get("label", "")
+    label_markup = ""
+    if label:
+        label_width = _edge_label_width(label)
+        label_height = 28
+        center_x = (start_x + end_x) // 2
+        center_y = (start_y + end_y) // 2
+        label_markup = (
+            f'<g class="diagram-edge-label-group" transform="translate({center_x} {center_y})">'
+            f'<rect class="diagram-edge-label-backplate" x="{-label_width // 2}" '
+            f'y="{-label_height // 2}" width="{label_width}" height="{label_height}" rx="8"></rect>'
+            f'<text class="diagram-edge-label" x="0" y="5" text-anchor="middle">{_text(label)}</text></g>'
+        )
     return (
         f'<path class="diagram-edge" data-edge-from="{node_identifiers[edge["from"]]}" '
         f'data-edge-to="{node_identifiers[edge["to"]]}" marker-end="url(#{marker_id})" '
         f'd="M {start_x} {start_y} L {end_x} {end_y}"></path>'
-        f'<text class="diagram-edge-label" x="{(start_x + end_x) // 2}" '
-        f'y="{(start_y + end_y) // 2 - 10}">{_text(label)}</text>'
+        f'{label_markup}'
     )
 
 
@@ -326,12 +352,13 @@ def render_relation(section: Mapping[str, Any]) -> str:
         raise ValueError("node group is only boundary-map metadata")
     node_identifiers = {node["id"]: f"node-{index}" for index, node in enumerate(nodes)}
     edges = _relation_edges(section, set(node_identifiers))
+    gap = _relation_gap(edges)
     if section_type == "boundary-map":
-        positions, boundaries = _boundary_layout(nodes)
+        positions, boundaries = _boundary_layout(nodes, gap)
     else:
         positions = {
             node["id"]: position
-            for node, position in zip(nodes, relation_positions(section_type, len(nodes)))
+            for node, position in zip(nodes, relation_positions(section_type, len(nodes), gap))
         }
         boundaries = ""
     identifier = slugify(section["id"]) or "relation"

@@ -50,18 +50,33 @@ h2 { font-size: 1.05rem; }
 .lesson-footer { color: var(--color-muted); font-size: .9rem; }
 .technical-visual { overflow: hidden; }
 .technical-visual svg { display: block; width: 100%; height: auto; min-height: 15rem; border: 1px solid var(--color-line); border-radius: 14px; background: var(--color-paper); }
+.desktop-diagram { display: block; }
+.mobile-semantic-flow { display: none; list-style: none; margin: 1rem 0 0; padding: 0; gap: .75rem; }
+.mobile-flow-node, .mobile-flow-relation { border: 1px solid var(--color-line); border-radius: 12px; padding: .75rem; }
+.mobile-flow-node { display: grid; gap: .2rem; background: var(--color-panel); }
+.mobile-flow-relation { color: var(--color-muted); }
+.mobile-flow-detail, .mobile-flow-kind, .mobile-flow-group { font-size: .9rem; color: var(--color-muted); }
 .diagram-edge { fill: none; stroke: var(--color-active); stroke-width: 2; }
+.diagram-boundary { fill: var(--color-panel); stroke: var(--color-line); stroke-width: 1.5; }
+.diagram-boundary-label { fill: var(--color-ink); font-family: system-ui, sans-serif; font-size: 14px; font-weight: 750; }
 .diagram-node rect { fill: var(--color-panel); stroke: var(--color-ink); stroke-width: 1.5; }
-.diagram-node text, .diagram-edge-label { fill: var(--color-ink); font-family: system-ui, sans-serif; font-size: 14px; }
+.diagram-node text { fill: var(--color-ink); font-family: system-ui, sans-serif; font-size: 14px; }
+.diagram-edge-label-backplate { fill: var(--color-panel); stroke: none; }
+.diagram-edge-label { fill: var(--color-ink); font-family: system-ui, sans-serif; font-size: 14px; font-weight: 750; text-anchor: middle; paint-order: stroke fill; stroke: var(--color-panel); stroke-width: 6px; stroke-linejoin: round; }
 
 @media (max-width: 720px) {
   .page { padding: 1.25rem .85rem; }
   .panel { padding: 1.2rem; }
   .detail-grid { grid-template-columns: 1fr; }
+  .desktop-diagram { display: none; }
+  .technical-visual .desktop-diagram { display: none; }
+  .mobile-semantic-flow { display: grid; }
 }
 
 @media (prefers-color-scheme: dark) {
   :root { --color-ink: #e8edf7; --color-muted: #b5c0d3; --color-paper: #101827; --color-panel: #172033; --color-line: #31405b; }
+  .diagram-boundary { fill: var(--color-panel); stroke: var(--color-line); }
+  .diagram-boundary-label { fill: var(--color-ink); }
   .diagram-node rect { fill: var(--color-panel); stroke: var(--color-ink); }
   .diagram-node text, .diagram-edge-label { fill: var(--color-ink); }
 }
@@ -74,13 +89,16 @@ h2 { font-size: 1.05rem; }
   body { background: #fff; color: #000; }
   .page { max-width: none; padding: 0; }
   .panel { box-shadow: none; break-inside: avoid; }
+  .desktop-diagram { display: block; }
+  .technical-visual .desktop-diagram { display: block; }
+  .mobile-semantic-flow { display: none; }
 }
 
   </style>
 </head>
 <body>
   <main class="page">
-<article class="lesson-card"><section class="panel" aria-labelledby="lesson-title"><p class="eyebrow">Concept</p><h1 id="lesson-title">Archive、Memory 与 Authoritative State 的三种记录</h1><p class="summary">Archive 保存可回看的证据，Memory 提供便利但可过期的上下文；只有 Authoritative State 是当前事实，Trace 才说明事实如何变化。</p><div class="detail-grid"><section class="detail-panel detail-panel--active"><h2>Core concept</h2><p>Use this idea to distinguish a capable model from a dependable system.</p></section><section class="detail-panel detail-panel--success"><h2>Operational signal</h2><p>Look for evidence, accountable state, and a verifiable result.</p></section></div></section><section class="panel"><h2>Sources</h2><ol class="source-list"><li>skills/learning-companion/references/lesson-session-contract.md#Ledger-and-timestamps</li></ol></section></article>
+<article class="lesson-card"><section class="panel" aria-labelledby="lesson-title"><p class="eyebrow">Concept</p><h1 id="lesson-title">Archive、Memory 与 Authoritative State 的三种记录</h1><p class="summary">Archive 保存可回看的证据，Memory 提供便利但可过期的上下文；只有 Authoritative State 是当前事实，Trace 才说明事实如何变化。</p><div class="detail-grid"><section class="detail-panel detail-panel--active"><h2>Core concept</h2><p>Use this idea to distinguish a capable model from a dependable system.</p></section><section class="detail-panel detail-panel--success"><h2>Operational signal</h2><p>Look for evidence, accountable state, and a verifiable result.</p></section></div></section><section class="panel"><h2>Sources</h2><ol class="source-list"><li>evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK</li></ol></section></article>
     <footer class="lesson-footer">企业 AI 系统分层：从模型能力到可靠交付 · Day 01</footer>
   </main>
 </body>
