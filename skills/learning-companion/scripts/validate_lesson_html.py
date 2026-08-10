@@ -43,6 +43,7 @@ RESOURCE_ATTRIBUTES = frozenset(
         "data",
         "formaction",
         "href",
+        "imagesrcset",
         "longdesc",
         "manifest",
         "ping",
@@ -53,6 +54,7 @@ RESOURCE_ATTRIBUTES = frozenset(
         "usemap",
     }
 )
+MULTI_URL_ATTRIBUTES = frozenset({"imagesrcset", "ping", "srcset"})
 SUBMISSION_ATTRIBUTES = frozenset({"action", "formaction"})
 UNSAFE_ELEMENTS = frozenset({"area", "base", "embed", "form", "link", "object"})
 VOID_TAGS = frozenset({"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"})
@@ -328,6 +330,9 @@ class ContractParser(HTMLParser):
                 self.inline_style_records.append(value)
             if name in SUBMISSION_ATTRIBUTES:
                 self.submission_attributes.append(name)
+            if name in MULTI_URL_ATTRIBUTES:
+                self.external_resources.append((tag, name, value or ""))
+                continue
             if name in RESOURCE_ATTRIBUTES and value is not None:
                 violation = url_violation(value)
                 if violation == "external-resource-forbidden":

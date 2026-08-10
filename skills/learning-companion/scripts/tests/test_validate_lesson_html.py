@@ -255,6 +255,29 @@ class ValidateLessonHtmlTest(unittest.TestCase):
                     expected, validate_html(self.write(html), (), "document")["errors"]
                 )
 
+    def test_rejects_external_candidates_in_multi_url_attributes(self):
+        cases = (
+            (
+                "srcset mixed newline",
+                '<img srcset="#topic 1x,\nHTTPS://evil.test/a.png 2x">',
+            ),
+            (
+                "imagesrcset data first",
+                '<img imagesrcset="data:image/png;base64,AA== 1x, hTtPs://evil.test/a.png 2x">',
+            ),
+            (
+                "ping mixed",
+                '<a href="#topic" PiNg="#local\nHTTPS://evil.test/p">x</a>',
+            ),
+        )
+        for name, markup in cases:
+            with self.subTest(name=name):
+                html = DOCUMENT_HTML.replace("</body>", markup + "</body>")
+                self.assertIn(
+                    "external-resource-forbidden",
+                    validate_html(self.write(html), (), "document")["errors"],
+                )
+
     def test_duplicate_security_attributes_fail_before_value_collapse(self):
         cases = (
             (
