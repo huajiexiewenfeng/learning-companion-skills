@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <title>旧版学习看板</title>
+  <style>
+    body { color: #172033; }
+    /* user-custom-css */
+    .learner-note { color: rebeccapurple; }
+  </style>
+</head>
+<body>
+  <aside>
+    <nav class="nav-group" aria-label="页面导航">
+      <a class="nav-link" href="#dashboard">学习仪表盘</a>
+    </nav>
+  </aside>
+  <main>
+    <section class="section" id="dashboard"><h1>学习仪表盘</h1></section>
+    <section class="section" id="mastery"><h2>掌握度</h2></section>
+    <div class="learner-note">用户内容：保持不变</div>
+  </main>
+  <script id="learning-data">
+window.learningData = {
+  generatedAt: "2026-08-09 15:30",
+  dashboard: { planName: "企业 AI 系统分层" },
+  customText: "Unicode 不变；script-like: <\\/script>"
+};
+  </script>
+  <script>
+    function byId(id) { return document.getElementById(id); }
+    function renderSources(files, generatedAt) { return [files, generatedAt]; }
+    function render() {
+      const data = window.learningData || {};
+      document.title = data.dashboard && data.dashboard.planName || "学习看板";
+      renderSources(data.sourceFiles || [], data.generatedAt);
+    }
+
+    render();
+  </script>
+</body>
+</html>

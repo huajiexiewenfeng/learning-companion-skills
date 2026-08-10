@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-learning-console-version="2">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -519,6 +519,13 @@
       .metric-value { font-size: 21px; }
       .bar-row { grid-template-columns: 1fr; }
     }
+    <!-- learning-companion:lesson-sessions:style:start -->
+    .lesson-session-list { display: grid; gap: 10px; }
+    .lesson-session-row { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-soft); }
+    .lesson-session-title { font-size: 14px; font-weight: 780; }
+    .lesson-session-meta { color: var(--muted); font-size: 12px; }
+    .lesson-session-link { color: var(--blue); font-size: 13px; font-weight: 720; overflow-wrap: anywhere; }
+    <!-- learning-companion:lesson-sessions:style:end -->
   </style>
 </head>
 <body>
@@ -538,6 +545,9 @@
         <a class="nav-link" href="#roadmap"><span class="nav-dot"></span>学习路线图</a>
         <a class="nav-link" href="#logs"><span class="nav-dot"></span>学习日志</a>
         <a class="nav-link" href="#preview"><span class="nav-dot"></span>课程内容预览</a>
+        <!-- learning-companion:lesson-sessions:nav:start -->
+        <a class="nav-link" href="#lesson-sessions"><span class="nav-dot"></span>课程存档</a>
+        <!-- learning-companion:lesson-sessions:nav:end -->
         <a class="nav-link" href="#mastery"><span class="nav-dot"></span>进度与掌握</a>
       </nav>
 
@@ -674,6 +684,20 @@
             </div>
           </div>
         </section>
+
+        <!-- learning-companion:lesson-sessions:section:start -->
+        <section class="section" id="lesson-sessions" data-console-feature="lesson-sessions-v1">
+          <div>
+            <div class="section-kicker">05 / 课程存档</div>
+            <h2 class="section-title">回到每次学习的材料</h2>
+            <p class="section-desc">显示当前课程和已生成的课程存档；只链接相对工作区路径。</p>
+          </div>
+          <div class="panel">
+            <div class="panel-header"><div><h3>课程会话</h3><p>来自 lessonSessions</p></div></div>
+            <div class="panel-body"><div class="lesson-session-list" id="lessonSessionsList"></div></div>
+          </div>
+        </section>
+        <!-- learning-companion:lesson-sessions:section:end -->
 
         <section class="section" id="mastery">
           <div>
@@ -815,7 +839,18 @@
           { day: "3", topic: "token / context / embedding", mastery: 3.5 },
           { day: "10", topic: "第一阶段复盘", mastery: 5 }
         ]
-      }
+      },
+      activeLesson: {
+        sessionId: "2026-08-09-day-001-session-01", day: "1", topic: "企业 AI 系统分层",
+        mode: "voice", depth: "medium", status: "studying", updatedAt: "2026-08-09 15:30",
+        indexPath: "learning-companion/plans/enterprise-ai-transformation-runtime/lessons/2026-08-09-day-001-session-01/index.html",
+        artifactCount: 8
+      },
+      lessonSessions: [{
+        sessionId: "2026-08-09-day-001-session-01", day: "1", topic: "企业 AI 系统分层",
+        status: "studying", indexPath: "learning-companion/plans/enterprise-ai-transformation-runtime/lessons/2026-08-09-day-001-session-01/index.html",
+        documentCount: 3, deckCount: 1, visualCount: 2
+      }]
     };
   </script>
 
@@ -947,6 +982,49 @@
       `;
     }
 
+    <!-- learning-companion:lesson-sessions:renderer:start -->
+    function safeLessonPath(value) {
+      const path = String(value || "").trim();
+      return path && !/^[a-z][a-z0-9+.-]*:/i.test(path) && !/^(?:\\|\/\/)/.test(path) && !/[\u0000-\u001f\s]/.test(path) ? path : "";
+    }
+
+    function renderLessonSessions(sessions, activeLesson) {
+      const list = byId("lessonSessionsList");
+      if (!list) return;
+      const rows = Array.isArray(sessions) ? sessions.slice() : [];
+      if (activeLesson && !rows.some(item => item && item.sessionId === activeLesson.sessionId)) rows.unshift(activeLesson);
+      const content = [];
+      if (!rows.length) {
+        const empty = document.createElement("div");
+        empty.className = "item-card pending";
+        empty.textContent = "暂无课程存档";
+        content.push(empty);
+      }
+      for (const session of rows) {
+        if (!session || typeof session !== "object") continue;
+        const row = document.createElement("article");
+        row.className = "lesson-session-row";
+        const title = document.createElement("div");
+        title.className = "lesson-session-title";
+        title.textContent = `Day ${session.day || "-"} · ${session.topic || session.sessionId || "未命名课程"}`;
+        const meta = document.createElement("div");
+        meta.className = "lesson-session-meta";
+        meta.textContent = `状态：${session.status || "unknown"} · 文档 ${session.documentCount || 0} · 课件 ${session.deckCount || 0} · 视觉材料 ${session.visualCount || 0}`;
+        row.append(title, meta);
+        const path = safeLessonPath(session.indexPath);
+        if (path) {
+          const link = document.createElement("a");
+          link.className = "lesson-session-link";
+          link.href = path;
+          link.textContent = "打开课程存档";
+          row.append(link);
+        }
+        content.push(row);
+      }
+      list.replaceChildren(...content);
+    }
+    <!-- learning-companion:lesson-sessions:renderer:end -->
+
     function render() {
       const data = window.learningData || {};
       const dashboard = data.dashboard || {};
@@ -983,6 +1061,9 @@
       renderTags("weakPoints", mastery.weakPoints, "暂无明确薄弱点");
       renderSuggestions(mastery.reviewSuggestions);
       renderSources(data.sourceFiles || [], data.generatedAt);
+      <!-- learning-companion:lesson-sessions:render-call:start -->
+      renderLessonSessions(data.lessonSessions || [], data.activeLesson || null);
+      <!-- learning-companion:lesson-sessions:render-call:end -->
     }
 
     render();

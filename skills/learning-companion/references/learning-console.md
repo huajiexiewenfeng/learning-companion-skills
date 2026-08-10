@@ -13,6 +13,7 @@ The console helps the learner quickly see:
 - 学习日志
 - 课程内容预览
 - 进度与掌握
+- 课程存档
 
 The console is only a view layer. Markdown remains the source of truth.
 
@@ -220,6 +221,12 @@ Shows lightweight statistics:
 - lowest mastery
 - weak points and review suggestions when evidence exists
 
+### 课程存档
+
+Shows `activeLesson` and `lessonSessions` as links to generated lesson artifacts. Render
+session values as text, and only allow relative `indexPath` values; never interpolate
+archive values into HTML or accept executable/network URL schemes.
+
 ## Update Rules
 
 Update the console only when one of these happens:
@@ -254,4 +261,13 @@ Do not create the console during:
 - Marking effective progress without close-out evidence.
 - Updating mastery score without a scored review/log entry.
 - Rewriting the full page when a data-section update is enough.
+- Replacing custom CSS, content, or `script#learning-data` while upgrading a legacy console.
 - Creating a complex app when a static evidence-backed page is enough.
+
+## Safe Console Upgrade
+
+Use `scripts/upgrade_learning_console.py` to move a version-1 console to version 2. It
+copies only template marker-delimited navigation, styles, lesson-session section, renderer,
+and render call around unique legacy anchors. It refuses malformed, missing, or ambiguous
+anchors without writing the target, preserves the data block and custom content, and writes
+atomically as UTF-8 without a BOM. A valid version-2 console is a byte-identical no-op.
