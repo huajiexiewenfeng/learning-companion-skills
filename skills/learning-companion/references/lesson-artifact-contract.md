@@ -77,3 +77,12 @@ Deterministic validation does not replace visual review. Review each artifact
 in a desktop browser and at an explicit 390px viewport. If a browser is
 unavailable, the artifact status must literally be `visual verification pending`
 and state that desktop and 390px reviews remain.
+
+## Teaching package gate
+
+The teaching protocol may open/link a package or begin teaching only after the
+session runtime reports a passed package and every declared artifact passes its
+declared profile. A minimum teaching package has `lesson.md`,
+`lesson-model.json`, `artifacts.md`, an `index.html` hub, one main deck, and at
+least one `technical-visual`. A package that is visually pending may be linked
+with that literal status; it must not be described as visually reviewed.

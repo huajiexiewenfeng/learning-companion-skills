@@ -48,6 +48,8 @@ Read the relevant reference before acting:
 - `references/scoring-and-review.md` when judging completion, effective progress, low-score review tasks, or weekly review.
 - `references/learning-console.md` when the user asks to view, create, refresh, or summarize the learning dashboard, learning panel, progress, stats, mastery, route map, course preview, or recent logs.
 - `references/learning-console-data-contract.md` when creating or refreshing `learning-console.html`.
+- `references/lesson-session-contract.md`, `references/lesson-model-authoring.md`, and `references/lesson-artifact-contract.md` before a teaching session is prepared, synced, validated, recovered, or closed.
+- `references/voice-teaching.md` before handling an explicit Voice teaching request or making a current native Voice product claim.
 
 ## Default Data Location
 
@@ -191,48 +193,72 @@ When the user replies `下课`, run a short review:
 1. Ask for one-sentence understanding.
 2. Ask 1-3 verification questions, staying within 5 minutes.
 3. Score mastery.
-4. Update dashboard and log.
-5. Decide tomorrow's strategy.
+4. For an open lesson session, run `lesson_package.py close SESSION` only after the normal mastery review passes; this closes and freezes its artifacts.
+5. Update dashboard and log, then decide tomorrow's strategy.
 6. If `learning-companion/learning-console.html` exists, refresh only its `window.learningData` section.
+
+`下课` is the only path that may advance Effective progress. It may do so only after the normal mastery review, and never merely because a lesson package was prepared, a text answer was sent, or native Voice was requested.
+
+## Teaching Routes
+
+Route teaching requests before allocating a lesson session. An explicit Voice phrase wins over a generic teaching phrase.
+
+| User request | Mode | Next action |
+| --- | --- | --- |
+| `上课`, `continue learning`, `继续学习`, or a normal request to explain or teach | text | Prepare the courseware package, then teach in this text task. |
+| `语音上课`, `用语音教我`, `实时语音老师`, or `Voice teacher` | Voice | Prepare the same courseware package, then follow `references/voice-teaching.md`. |
+
+Do not infer Voice from a generic text teaching request, and do not claim that an existing text task can switch into native Voice.
+
+## Prepare And Validate Courseware
+
+Courseware is a prerequisite, not a follow-up: both text and Voice modes prepare and validate the minimum lesson package before teaching or handoff. Read `references/lesson-session-contract.md`, `references/lesson-model-authoring.md`, and `references/lesson-artifact-contract.md`, then use `lesson_package.py` as the package runtime.
+
+The exact state machine and ordering are:
+
+```text
+source read → allocate → lesson.md + lesson-model.json → model validation
+→ render → per-artifact validation → open/link hub → teach/handoff
+start → preparing → validated package → text: studying and teach
+                                      → Voice: awaiting-voice and handoff
+                                      → Voice takeover observed: studying
+```
+
+1. Read the active plan, today's source item, and any latest open session; do not invent missing source or state.
+2. Allocate the session with `lesson_package.py allocate`. Its initial state is `preparing`.
+3. Author `lesson.md` and `lesson-model.json` from the supplied plan/source, following `lesson-model-authoring.md`; validate the model before rendering.
+4. Run `lesson_package.py prepare SESSION`. The minimum lesson package is `lesson.md`, `lesson-model.json`, `artifacts.md`, `index.html`, one main deck, and one `technical-visual`.
+5. Require a passed package result and passed per-artifact validation before publication. On any failed model, render, or artifact gate, keep the session `preparing`, report the exact failed gate, and neither teach nor hand off.
+6. Open the `index.html` hub when the host can observe it; otherwise provide its clickable local path/link. Only then start text teaching or begin the Voice handoff.
+
+Never substitute an unvalidated explanation, a dashboard-only preview, or an imagined file for this package gate.
 
 ## Teaching Protocol
 
-Use tutor mode when the user asks for teaching, not just tracking. Trigger examples:
+Use tutor mode after the courseware package has passed its gates. It is a teaching layer on top of the learning manager, not a replacement for the user's source material.
 
-- `你来教我学习`
-- `继续学习`
-- `我不明白`
-- `换个例子`
-- `老师模式`
-- any request that asks the assistant to explain, teach, clarify, or continue today's learning topic
+For a recovered request, locate and validate the latest open session for the active plan before allocating a new one. Never invent session state: if no open session or no trustworthy state exists, say so and restart from the source-read gate.
 
-Tutor mode should stay lightweight and tied to the current plan item. It is a teaching layer on top of the learning manager, not a replacement for the source material.
+Each text or Voice teaching turn is speech-first: one 45–90 second concept chunk, interruption-first, then exactly one check question. Keep the chunk tied to the current source and prepared package. When the user interrupts, answer the interruption before resuming; do not stack a second question.
 
-When tutor mode starts:
+Persist a teaching turn in this exact order:
 
-1. Identify the active plan and today's item from `dashboard.md`.
-2. If today's item is not started, mark it as studying before teaching.
-3. Teach the current topic in small steps:
-   - state the core idea in plain language
-   - connect it to the user's plan, project, or source material
-   - give one concrete example
-   - name one common misconception or boundary
-   - ask exactly one check question
-4. If the user says they do not understand, change the explanation style:
-   - use a simpler analogy
-   - use a smaller example
-   - contrast two nearby concepts
-   - avoid repeating the same wording
-5. If the user asks for another example, give one focused example and then ask one check question.
+1. Update the session Markdown first (`lesson.md` and any session log/source record).
+2. Run `lesson_package.py sync SESSION` for versioned HTML sync and validate its result.
+3. Only then respond with the teaching turn.
+
+On a write failure, you must not run sync HTML and must not claim persistence. If the sync or validation fails, disclose that the package is not persisted/current, do not claim the HTML was updated, and repair or stop before the next teaching turn.
 
 Tutor mode must not:
 
 - advance effective progress without a close-out review
 - overwhelm the user with a long lecture
 - introduce large external material unless the user asks
-- ask multiple questions at once
+- ask more than exactly one check question per turn
 - turn the session into homework
 - change the static HTML dashboard layout
+
+For an explicit Voice route, stop text teaching after courseware publication and follow `references/voice-teaching.md`; `awaiting-voice` becomes `studying` only after the required native Voice takeover is observably active.
 
 At the end of a tutor-mode response, invite the user to continue with one low-friction next step. If the user appears ready to finish, ask them to reply `下课` so the normal close-out review can score mastery and update progress.
 

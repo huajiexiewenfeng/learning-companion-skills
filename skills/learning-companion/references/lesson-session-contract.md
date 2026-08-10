@@ -32,8 +32,10 @@ close_session(session_dir) -> PackageReport
 `prepare` requires both `lesson.md` and `lesson-model.json`. It renders into a
 UUID-named session-local staging directory and promotes nothing until every
 gate passes. A text or hybrid session becomes `studying`; a voice session
-becomes `awaiting-voice`. A failed prepare remains `preparing` and has no final
-artifact promotion.
+becomes `awaiting-voice`. The teaching layer may transition `awaiting-voice` to
+`studying` only after observable host evidence that a new native Voice task has
+taken over the prepared session. A failed prepare remains `preparing` and has
+no final artifact promotion.
 
 `prepare`, `sync`, `validate`, and `close` hold an exclusive per-session lock.
 They re-read the model, lifecycle state, and ledger only after acquiring that
@@ -71,7 +73,9 @@ file, never a foreign collision file that won the path.
 `close` performs the final render with hub refresh disabled, sets both lesson
 metadata files to `closed`, and writes `.artifacts-frozen`. Frozen packages
 reject later `sync` calls; existing progress-related files are outside this
-module's write scope.
+module's write scope. Closing/freezing is a package action, not evidence of
+mastery: the parent learning protocol performs it only after its normal `下课`
+mastery review and is solely responsible for any Effective-progress decision.
 
 ## Ledger and timestamps
 
