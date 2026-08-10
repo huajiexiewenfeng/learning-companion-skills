@@ -1,0 +1,23 @@
+name: Learning Companion CI
+
+on:
+  push:
+    paths:
+      - 'skills/learning-companion/**'
+      - 'examples/technical-learning/**'
+      - '.github/workflows/learning-companion-ci.yml'
+  pull_request:
+    paths:
+      - 'skills/learning-companion/**'
+      - 'examples/technical-learning/**'
+      - '.github/workflows/learning-companion-ci.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m unittest discover skills/learning-companion/scripts/tests -v

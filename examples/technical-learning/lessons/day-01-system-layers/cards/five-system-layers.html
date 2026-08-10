@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>五层企业 AI 系统分层</title>
+  <style>
+:root {
+  --color-ink: #172033;
+  --color-muted: #5d6980;
+  --color-paper: #f6f8fc;
+  --color-panel: #ffffff;
+  --color-line: #dbe2ee;
+  --color-active: #2f6fed;
+  --color-success: #168a5b;
+  --color-gate: #b87900;
+  --color-risk: #c24141;
+  --color-neutral: #667085;
+  --radius-panel: 22px;
+  --shadow-panel: 0 12px 30px rgb(38 58 92 / 0.07);
+  --content-width: 1120px;
+  color-scheme: light dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.6;
+}
+
+.page { max-width: var(--content-width); margin: 0 auto; padding: 3rem 1.5rem; }
+.lesson-card { display: grid; gap: 1.5rem; }
+.panel { background: var(--color-panel); border: 1px solid var(--color-line); border-radius: var(--radius-panel); box-shadow: var(--shadow-panel); padding: 1.75rem; }
+.eyebrow { margin: 0 0 .75rem; color: var(--color-active); font-size: .78rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+h1, h2, p { margin-top: 0; }
+h1 { max-width: 22ch; margin-bottom: .7rem; font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.1; }
+h2 { font-size: 1.05rem; }
+.summary { max-width: 68ch; margin-bottom: 0; color: var(--color-muted); font-size: 1.08rem; }
+.detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.detail-panel { border: 1px solid var(--color-line); border-radius: 14px; padding: 1rem; }
+.detail-panel--active { border-color: var(--color-active); }
+.detail-panel--success { border-color: var(--color-success); }
+.detail-panel--gate { border-color: var(--color-gate); }
+.source-list { margin: 0; padding-left: 1.3rem; color: var(--color-muted); }
+.source-list li + li { margin-top: .35rem; }
+.lesson-footer { color: var(--color-muted); font-size: .9rem; }
+.technical-visual { overflow: hidden; }
+.technical-visual svg { display: block; width: 100%; height: auto; min-height: 15rem; border: 1px solid var(--color-line); border-radius: 14px; background: var(--color-paper); }
+.diagram-edge { fill: none; stroke: var(--color-active); stroke-width: 2; }
+.diagram-node rect { fill: var(--color-panel); stroke: var(--color-ink); stroke-width: 1.5; }
+.diagram-node text, .diagram-edge-label { fill: var(--color-ink); font-family: system-ui, sans-serif; font-size: 14px; }
+
+@media (max-width: 720px) {
+  .page { padding: 1.25rem .85rem; }
+  .panel { padding: 1.2rem; }
+  .detail-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root { --color-ink: #e8edf7; --color-muted: #b5c0d3; --color-paper: #101827; --color-panel: #172033; --color-line: #31405b; }
+  .diagram-node rect { fill: var(--color-panel); stroke: var(--color-ink); }
+  .diagram-node text, .diagram-edge-label { fill: var(--color-ink); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; transition: none !important; }
+}
+
+@media print {
+  body { background: #fff; color: #000; }
+  .page { max-width: none; padding: 0; }
+  .panel { box-shadow: none; break-inside: avoid; }
+}
+
+  </style>
+</head>
+<body>
+  <main class="page">
+<article class="lesson-card"><section class="panel technical-visual" aria-labelledby="lesson-title"><p class="eyebrow">Systems relationship</p><h1 id="lesson-title">五层企业 AI 系统分层</h1><p class="summary">每一层都有清楚的责任边界：意图、运行时、知识记忆、治理工作流，以及权威状态与可观测性。</p><svg class="desktop-diagram diagram--layer-map" viewBox="0 0 1040 720" role="img" aria-labelledby="five-system-layers-title five-system-layers-desc"><title id="five-system-layers-title">五层企业 AI 系统分层</title><desc id="five-system-layers-desc">每一层都有清楚的责任边界：意图、运行时、知识记忆、治理工作流，以及权威状态与可观测性。</desc><defs><marker id="five-system-layers-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker></defs><path class="diagram-edge" data-edge-from="node-0" data-edge-to="node-1" marker-end="url(#five-system-layers-arrow)" d="M 430 136 L 430 176"></path><text class="diagram-edge-label" x="430" y="146">表达目标</text><path class="diagram-edge" data-edge-from="node-1" data-edge-to="node-2" marker-end="url(#five-system-layers-arrow)" d="M 430 272 L 430 312"></path><text class="diagram-edge-label" x="430" y="282">请求证据</text><path class="diagram-edge" data-edge-from="node-2" data-edge-to="node-3" marker-end="url(#five-system-layers-arrow)" d="M 430 408 L 430 448"></path><text class="diagram-edge-label" x="430" y="418">提供依据</text><path class="diagram-edge" data-edge-from="node-3" data-edge-to="node-4" marker-end="url(#five-system-layers-arrow)" d="M 430 544 L 430 584"></path><text class="diagram-edge-label" x="430" y="554">受控转换</text><g class="diagram-node diagram-node--neutral" data-node-id="node-0" transform="translate(330 40)"><rect width="200" height="96" rx="12" style="stroke:var(--color-neutral)"></rect><text x="100" y="29" text-anchor="middle">体验与意图层</text><text class="diagram-node-detail" x="100" y="55" text-anchor="middle">目标、约束与验收，不声明业务事实</text><text class="diagram-node-kind" x="100" y="79" text-anchor="middle">neutral</text></g><g class="diagram-node diagram-node--active" data-node-id="node-1" transform="translate(330 176)"><rect width="200" height="96" rx="12" style="stroke:var(--color-active)"></rect><text x="100" y="29" text-anchor="middle">模型与代理运行时</text><text class="diagram-node-detail" x="100" y="55" text-anchor="middle">模型能力提出候选与工具请求</text><text class="diagram-node-kind" x="100" y="79" text-anchor="middle">active</text></g><g class="diagram-node diagram-node--success" data-node-id="node-2" transform="translate(330 312)"><rect width="200" height="96" rx="12" style="stroke:var(--color-success)"></rect><text x="100" y="29" text-anchor="middle">知识与记忆层：Archive / Memory</text><text class="diagram-node-detail" x="100" y="55" text-anchor="middle">Archive 留证据；Memory 提供可过期的压缩上下文</text><text class="diagram-node-kind" x="100" y="79" text-anchor="middle">success</text></g><g class="diagram-node diagram-node--gate" data-node-id="node-3" transform="translate(330 448)"><rect width="200" height="96" rx="12" style="stroke:var(--color-gate)"></rect><text x="100" y="29" text-anchor="middle">工作流与治理层：Plan / Checkpoint</text><text class="diagram-node-detail" x="100" y="55" text-anchor="middle">Plan 表示意图；Checkpoint 核验权限和前置条件</text><text class="diagram-node-kind" x="100" y="79" text-anchor="middle">gate</text></g><g class="diagram-node diagram-node--risk" data-node-id="node-4" transform="translate(330 584)"><rect width="200" height="96" rx="12" style="stroke:var(--color-risk)"></rect><text x="100" y="29" text-anchor="middle">权威状态与可观测层：Authoritative State / Trace</text><text class="diagram-node-detail" x="100" y="55" text-anchor="middle">当前事实与实际事件链，支撑系统能力</text><text class="diagram-node-kind" x="100" y="79" text-anchor="middle">risk</text></g></svg><ol class="mobile-semantic-flow"><li class="mobile-flow-node mobile-flow-node--neutral"><strong>体验与意图层</strong><span class="mobile-flow-detail">目标、约束与验收，不声明业务事实</span><span class="mobile-flow-kind">neutral</span></li><li class="mobile-flow-node mobile-flow-node--active"><strong>模型与代理运行时</strong><span class="mobile-flow-detail">模型能力提出候选与工具请求</span><span class="mobile-flow-kind">active</span></li><li class="mobile-flow-node mobile-flow-node--success"><strong>知识与记忆层：Archive / Memory</strong><span class="mobile-flow-detail">Archive 留证据；Memory 提供可过期的压缩上下文</span><span class="mobile-flow-kind">success</span></li><li class="mobile-flow-node mobile-flow-node--gate"><strong>工作流与治理层：Plan / Checkpoint</strong><span class="mobile-flow-detail">Plan 表示意图；Checkpoint 核验权限和前置条件</span><span class="mobile-flow-kind">gate</span></li><li class="mobile-flow-node mobile-flow-node--risk"><strong>权威状态与可观测层：Authoritative State / Trace</strong><span class="mobile-flow-detail">当前事实与实际事件链，支撑系统能力</span><span class="mobile-flow-kind">risk</span></li><li class="mobile-flow-relation"><strong>体验与意图层</strong> <span>表达目标</span> <strong>模型与代理运行时</strong></li><li class="mobile-flow-relation"><strong>模型与代理运行时</strong> <span>请求证据</span> <strong>知识与记忆层：Archive / Memory</strong></li><li class="mobile-flow-relation"><strong>知识与记忆层：Archive / Memory</strong> <span>提供依据</span> <strong>工作流与治理层：Plan / Checkpoint</strong></li><li class="mobile-flow-relation"><strong>工作流与治理层：Plan / Checkpoint</strong> <span>受控转换</span> <strong>权威状态与可观测层：Authoritative State / Trace</strong></li></ol></section><section class="panel"><h2>Sources</h2><ol class="source-list"><li>.superpowers/sdd/task-9-brief.md#Task-9</li></ol></section></article>
+    <footer class="lesson-footer">企业 AI 系统分层：从模型能力到可靠交付 · Day 01</footer>
+  </main>
+</body>
+</html>

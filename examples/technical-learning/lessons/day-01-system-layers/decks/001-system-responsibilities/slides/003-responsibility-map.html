@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>责任图：建议、控制与事实不能混在一起</title>
+  <style>
+:root {
+  --color-ink: #172033;
+  --color-muted: #5d6980;
+  --color-paper: #f6f8fc;
+  --color-panel: #ffffff;
+  --color-line: #dbe2ee;
+  --color-active: #2f6fed;
+  --color-success: #168a5b;
+  --color-gate: #b87900;
+  --color-risk: #c24141;
+  --color-neutral: #667085;
+  --radius-panel: 22px;
+  --shadow-panel: 0 12px 30px rgb(38 58 92 / 0.07);
+  --content-width: 1120px;
+  color-scheme: light dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.6;
+}
+
+.page { max-width: var(--content-width); margin: 0 auto; padding: 3rem 1.5rem; }
+.lesson-card { display: grid; gap: 1.5rem; }
+.panel { background: var(--color-panel); border: 1px solid var(--color-line); border-radius: var(--radius-panel); box-shadow: var(--shadow-panel); padding: 1.75rem; }
+.eyebrow { margin: 0 0 .75rem; color: var(--color-active); font-size: .78rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
+h1, h2, p { margin-top: 0; }
+h1 { max-width: 22ch; margin-bottom: .7rem; font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.1; }
+h2 { font-size: 1.05rem; }
+.summary { max-width: 68ch; margin-bottom: 0; color: var(--color-muted); font-size: 1.08rem; }
+.detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.detail-panel { border: 1px solid var(--color-line); border-radius: 14px; padding: 1rem; }
+.detail-panel--active { border-color: var(--color-active); }
+.detail-panel--success { border-color: var(--color-success); }
+.detail-panel--gate { border-color: var(--color-gate); }
+.source-list { margin: 0; padding-left: 1.3rem; color: var(--color-muted); }
+.source-list li + li { margin-top: .35rem; }
+.lesson-footer { color: var(--color-muted); font-size: .9rem; }
+.technical-visual { overflow: hidden; }
+.technical-visual svg { display: block; width: 100%; height: auto; min-height: 15rem; border: 1px solid var(--color-line); border-radius: 14px; background: var(--color-paper); }
+.diagram-edge { fill: none; stroke: var(--color-active); stroke-width: 2; }
+.diagram-node rect { fill: var(--color-panel); stroke: var(--color-ink); stroke-width: 1.5; }
+.diagram-node text, .diagram-edge-label { fill: var(--color-ink); font-family: system-ui, sans-serif; font-size: 14px; }
+
+@media (max-width: 720px) {
+  .page { padding: 1.25rem .85rem; }
+  .panel { padding: 1.2rem; }
+  .detail-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root { --color-ink: #e8edf7; --color-muted: #b5c0d3; --color-paper: #101827; --color-panel: #172033; --color-line: #31405b; }
+  .diagram-node rect { fill: var(--color-panel); stroke: var(--color-ink); }
+  .diagram-node text, .diagram-edge-label { fill: var(--color-ink); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; transition: none !important; }
+}
+
+@media print {
+  body { background: #fff; color: #000; }
+  .page { max-width: none; padding: 0; }
+  .panel { box-shadow: none; break-inside: avoid; }
+}
+
+  </style>
+</head>
+<body>
+  <main class="page">
+<article class="lesson-card"><section class="panel technical-visual" aria-labelledby="lesson-title"><p class="eyebrow">Systems relationship</p><h1 id="lesson-title">责任图：建议、控制与事实不能混在一起</h1><p class="summary">责任图把人和业务、AI 运行时、系统记录与治理分开；只有受控操作才可改变 Authoritative State。</p><svg class="desktop-diagram diagram--boundary-map" viewBox="0 0 1040 644" role="img" aria-labelledby="responsibility-map-title responsibility-map-desc"><title id="responsibility-map-title">责任图：建议、控制与事实不能混在一起</title><desc id="responsibility-map-desc">责任图把人和业务、AI 运行时、系统记录与治理分开；只有受控操作才可改变 Authoritative State。</desc><defs><marker id="responsibility-map-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"></path></marker></defs><g class="diagram-boundaries"><g class="diagram-boundary-group"><rect class="diagram-boundary" x="20" y="40" width="240" height="196" rx="20"></rect><text class="diagram-boundary-label" x="40" y="72">人和业务</text></g><g class="diagram-boundary-group"><rect class="diagram-boundary" x="300" y="40" width="240" height="196" rx="20"></rect><text class="diagram-boundary-label" x="320" y="72">模型运行时</text></g><g class="diagram-boundary-group"><rect class="diagram-boundary" x="580" y="40" width="240" height="604" rx="20"></rect><text class="diagram-boundary-label" x="600" y="72">系统记录与治理</text></g></g><path class="diagram-edge" data-edge-from="node-0" data-edge-to="node-1" marker-end="url(#responsibility-map-arrow)" d="M 240 148 L 320 148"></path><text class="diagram-edge-label" x="280" y="138">给出目标</text><path class="diagram-edge" data-edge-from="node-1" data-edge-to="node-2" marker-end="url(#responsibility-map-arrow)" d="M 520 148 L 600 148"></path><text class="diagram-edge-label" x="560" y="138">读取证据</text><path class="diagram-edge" data-edge-from="node-1" data-edge-to="node-3" marker-end="url(#responsibility-map-arrow)" d="M 520 148 L 600 284"></path><text class="diagram-edge-label" x="560" y="206">提交受控请求</text><path class="diagram-edge" data-edge-from="node-2" data-edge-to="node-3" marker-end="url(#responsibility-map-arrow)" d="M 700 196 L 700 236"></path><text class="diagram-edge-label" x="700" y="206">核对依据</text><path class="diagram-edge" data-edge-from="node-3" data-edge-to="node-4" marker-end="url(#responsibility-map-arrow)" d="M 700 332 L 700 372"></path><text class="diagram-edge-label" x="700" y="342">允许写入</text><path class="diagram-edge" data-edge-from="node-4" data-edge-to="node-5" marker-end="url(#responsibility-map-arrow)" d="M 700 468 L 700 508"></path><text class="diagram-edge-label" x="700" y="478">追加事件</text><path class="diagram-edge" data-edge-from="node-5" data-edge-to="node-0" marker-end="url(#responsibility-map-arrow)" d="M 600 556 L 240 148"></path><text class="diagram-edge-label" x="420" y="342">支持验收</text><g class="diagram-node diagram-node--neutral" data-node-id="node-0" transform="translate(40 100)"><rect width="200" height="96" rx="12" style="stroke:var(--color-neutral)"></rect><text x="100" y="29" text-anchor="middle">业务负责人</text><text class="diagram-node-detail" x="100" y="55" text-anchor="middle">拥有目标、约束和验收</text><text class="diagram-node-kind" x="100" y="79" text-anchor="middle">neutral</text></g><g class="diagram-node diagram-node--active" data-node-id="node-1" transform="translate(320 100)"><rect width="200" height="96" rx="12" style="stroke:var(--color-active)"></rect><text x="100" y="29" text-anchor="middle">AI 代理</text><text class="diagram-node-detail" x="100" y="55" text-anchor="middle">形成 Plan 与候选操作</text><text class="diagram-node-kind" x="100" y="79" text-anchor="middle">active</text></g><g class="diagram-node diagram-node--success" data-node-id="node-2" transform="translate(600 100)"><rect width="200" height="96" rx="12" style="stroke:var(--color-success)"></rect><text x="100" y="29" text-anchor="middle">Archive 与 Memory</text><text class="diagram-node-detail" x="100" y="55" text-anchor="middle">提供历史证据与可复用上下文</text><text class="diagram-node-kind" x="100" y="79" text-anchor="middle">success</text></g><g class="diagram-node diagram-node--gate" data-node-id="node-3" transform="translate(600 236)"><rect width="200" height="96" rx="12" style="stroke:var(--color-gate)"></rect><text x="100" y="29" text-anchor="middle">Checkpoint</text><text class="diagram-node-detail" x="100" y="55" text-anchor="middle">检查权限、前置条件和审批</text><text class="diagram-node-kind" x="100" y="79" text-anchor="middle">gate</text></g><g class="diagram-node diagram-node--risk" data-node-id="node-4" transform="translate(600 372)"><rect width="200" height="96" rx="12" style="stroke:var(--color-risk)"></rect><text x="100" y="29" text-anchor="middle">Authoritative State</text><text class="diagram-node-detail" x="100" y="55" text-anchor="middle">保存当前事实与状态转换</text><text class="diagram-node-kind" x="100" y="79" text-anchor="middle">risk</text></g><g class="diagram-node diagram-node--success" data-node-id="node-5" transform="translate(600 508)"><rect width="200" height="96" rx="12" style="stroke:var(--color-success)"></rect><text x="100" y="29" text-anchor="middle">Trace</text><text class="diagram-node-detail" x="100" y="55" text-anchor="middle">证明输入、执行与结果的联系</text><text class="diagram-node-kind" x="100" y="79" text-anchor="middle">success</text></g></svg><ol class="mobile-semantic-flow"><li class="mobile-flow-node mobile-flow-node--neutral"><strong>业务负责人</strong><span class="mobile-flow-detail">拥有目标、约束和验收</span><span class="mobile-flow-kind">neutral</span><span class="mobile-flow-group">人和业务</span></li><li class="mobile-flow-node mobile-flow-node--active"><strong>AI 代理</strong><span class="mobile-flow-detail">形成 Plan 与候选操作</span><span class="mobile-flow-kind">active</span><span class="mobile-flow-group">模型运行时</span></li><li class="mobile-flow-node mobile-flow-node--success"><strong>Archive 与 Memory</strong><span class="mobile-flow-detail">提供历史证据与可复用上下文</span><span class="mobile-flow-kind">success</span><span class="mobile-flow-group">系统记录与治理</span></li><li class="mobile-flow-node mobile-flow-node--gate"><strong>Checkpoint</strong><span class="mobile-flow-detail">检查权限、前置条件和审批</span><span class="mobile-flow-kind">gate</span><span class="mobile-flow-group">系统记录与治理</span></li><li class="mobile-flow-node mobile-flow-node--risk"><strong>Authoritative State</strong><span class="mobile-flow-detail">保存当前事实与状态转换</span><span class="mobile-flow-kind">risk</span><span class="mobile-flow-group">系统记录与治理</span></li><li class="mobile-flow-node mobile-flow-node--success"><strong>Trace</strong><span class="mobile-flow-detail">证明输入、执行与结果的联系</span><span class="mobile-flow-kind">success</span><span class="mobile-flow-group">系统记录与治理</span></li><li class="mobile-flow-relation"><strong>业务负责人</strong> <span>给出目标</span> <strong>AI 代理</strong></li><li class="mobile-flow-relation"><strong>AI 代理</strong> <span>读取证据</span> <strong>Archive 与 Memory</strong></li><li class="mobile-flow-relation"><strong>AI 代理</strong> <span>提交受控请求</span> <strong>Checkpoint</strong></li><li class="mobile-flow-relation"><strong>Archive 与 Memory</strong> <span>核对依据</span> <strong>Checkpoint</strong></li><li class="mobile-flow-relation"><strong>Checkpoint</strong> <span>允许写入</span> <strong>Authoritative State</strong></li><li class="mobile-flow-relation"><strong>Authoritative State</strong> <span>追加事件</span> <strong>Trace</strong></li><li class="mobile-flow-relation"><strong>Trace</strong> <span>支持验收</span> <strong>业务负责人</strong></li></ol></section><section class="panel"><h2>Sources</h2><ol class="source-list"><li>.superpowers/sdd/task-9-brief.md#Task-9</li></ol></section></article>
+    <footer class="lesson-footer">企业 AI 系统分层：从模型能力到可靠交付 · Day 01</footer>
+  </main>
+</body>
+</html>

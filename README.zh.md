@@ -123,6 +123,24 @@ HTML 不是事实来源。skill 会读取 Markdown 文件，生成 `window.learn
 
 老师模式不会直接推进有效进度。学习者仍然通过 `下课` 收口，正常复盘会评分掌握度，并更新 dashboard 和 log。
 
+## Voice 课程课件与会话存档
+
+课件先于教学：无论是文字课还是明确的 Voice 请求，`learning-companion` 都会先写入可阅读的 Markdown 来源（`lesson.md`）和结构化 lesson model，渲染离线课件包，验证每个工件，再打开或链接课件 hub。Markdown 是可阅读的教学文本和来源记录，不是 HTML 的替代品。
+
+以下产物必须区分：
+
+- **原生 Voice** 是宿主中可观察到的新 Voice task 能力；已有文字 task 不会被悄悄切换成原生 Voice。
+- **可阅读教学文本** 是会话目录中的 `lesson.md` 来源记录。
+- **归档 HTML 课件** 是按会话保存的自包含 hub、卡片和可单独访问的 slide。
+- **HTML deck** 是 `decks/` 下渲染出的浏览器课件，不是 PowerPoint 导出。
+- **`.pptx`** 明确不在范围内；本仓库发布离线 HTML 课件，而不是演示文稿文件。
+
+每次教学都会拥有自己的会话存档和 artifact ledger。提交到仓库的确定性 renderer 会把相同的 `lesson-model.json` 输入生成相同字节；未变化的 sync 会复用工件，不会创建 `v2`。因此，即使是能力较低的模型，也只能产出受约束的结构化 model，最终 HTML 始终由可信运行时稳定生成。
+
+课件采用受 Technical Visual Companion 启发的门禁：离线自包含、响应式/深色/减少动效、关系图可访问性、精确来源证据、每个工件的确定性验证，以及独立的桌面与 390px 视觉复核。确定性验证不能替代视觉复核。
+
+准备课件、开始文字教学或交接到原生 Voice 都不会推进 Effective progress；只有完成掌握度复盘后的正常 `下课` 收口才可能推进。
+
 ## 数据模型
 
 学习数据属于用户自己的 workspace，不属于这个 skill 仓库。
@@ -147,6 +165,8 @@ examples/
   technical-learning/
     dashboard.md
     learning-console.html
+    lessons/
+      day-01-system-layers/           # 可读来源 + 渲染后的 HTML 存档
   philosophy-reading/
     dashboard.md
 ```

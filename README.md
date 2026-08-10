@@ -123,6 +123,24 @@ Tutor mode follows a compact pattern:
 
 Tutor mode does not advance effective progress by itself. The learner still finishes with `下课`, and the normal close-out review scores mastery and updates the dashboard and log.
 
+## Voice Courseware And Session Archives
+
+Courseware comes before teaching. For either a text lesson or an explicit Voice request, `learning-companion` first writes the readable Markdown source (`lesson.md`) and structured lesson model, renders the offline package, validates every artifact, and then opens or links the package hub. The Markdown file is the readable teaching transcript and source record; it is not an HTML replacement.
+
+Keep these outputs distinct:
+
+- **Native Voice** is a host capability in a new, observable Voice task. A text task cannot silently become native Voice.
+- **Readable transcript** is the session-local `lesson.md` source record.
+- **Archived HTML courseware** is the self-contained hub, cards, and independently addressable slides retained in a per-session archive.
+- **HTML deck** is a rendered browser deck under `decks/`; it is not a PowerPoint export.
+- **`.pptx`** is intentionally out of scope. This repository publishes offline HTML courseware, not presentation files.
+
+Each teaching session gets its own archive and artifact ledger. A deterministic committed renderer turns the same `lesson-model.json` input into the same bytes: an unchanged sync reuses artifacts instead of creating a `v2` copy. That lets a lower-capability model author a constrained structured model while the trusted runtime produces the final HTML consistently.
+
+The package uses Technical Visual Companion-inspired gates: offline self-containment, responsive/dark/reduced-motion behavior, accessible relationship diagrams, exact source evidence, per-artifact validation, and a separate desktop plus 390px visual review. Deterministic validation is necessary but does not substitute for that visual review.
+
+Preparing courseware, starting a text lesson, or handing off to native Voice never advances Effective progress. Only the normal `下课` close-out, after its mastery review, may do so.
+
 ## Data Model
 
 Generated learning data belongs to the user's workspace, not this skill repository.
@@ -147,6 +165,8 @@ examples/
   technical-learning/
     dashboard.md
     learning-console.html
+    lessons/
+      day-01-system-layers/           # readable source + rendered HTML archive
   philosophy-reading/
     dashboard.md
 ```
