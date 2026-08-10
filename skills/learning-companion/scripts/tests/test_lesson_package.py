@@ -39,6 +39,13 @@ takeover_voice_session = (
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
+GOLDEN_SESSION = (
+    SCRIPT_DIR.parents[2]
+    / "examples"
+    / "technical-learning"
+    / "lessons"
+    / "day-01-system-layers"
+)
 PYTHON = Path(r"C:\Users\admin\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe")
 
 
@@ -54,6 +61,13 @@ class LessonPackageTest(unittest.TestCase):
 
     def require_package(self):
         self.assertIsNotNone(allocate_session, "lesson_package.py must exist")
+
+    def test_repository_golden_survives_checkout_eol_normalization(self):
+        self.assertTrue(GOLDEN_SESSION.is_dir(), "repository golden session must exist")
+
+        report = validate_session(GOLDEN_SESSION)
+
+        self.assertEqual("passed", report.overall, report.errors)
 
     def allocate(self, *, mode="text"):
         self.require_package()

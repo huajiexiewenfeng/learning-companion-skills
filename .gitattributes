@@ -1,0 +1,3 @@
+# Lesson archives persist byte-level SHA-256 values in artifacts.md.
+examples/technical-learning/lessons/day-01-system-layers/* text eol=lf
+examples/technical-learning/lessons/day-01-system-layers/** text eol=lf
