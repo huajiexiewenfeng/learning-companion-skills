@@ -82,11 +82,11 @@ module's write scope. Closing/freezing is a package action, not evidence of
 mastery: the parent learning protocol performs it only after its normal `下课`
 mastery review and is solely responsible for any Effective-progress decision.
 
-Recovery is a teaching-layer selection rule: choose the newest open direct
-child by the allocated directory's date/day/session sequence before validating
-its source, model, and package. A failed newest session is never replaced by an
-older candidate; restart at source read/preparing and repair or allocate under
-the normal lifecycle instead.
+Recovery is a teaching-layer selection rule: select the single newest open
+session first by its allocated directory's date/day/session sequence. Validate
+that exact session's source, model, and package. If invalid, never fall back to
+older sessions; repair it only when its lifecycle permits, restart from
+source-read/preparing, or allocate under the normal lifecycle instead.
 
 ## Ledger and timestamps
 

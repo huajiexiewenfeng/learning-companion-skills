@@ -62,9 +62,13 @@ and no claim that courseware is current.
 
 ## Recovery And Product Claims
 
-Recover only the latest open session whose source, package report, and state
-can be read and validated. Never invent session state, a Voice connection, or
-a completed handoff.
+Select the single newest open session first, using its allocated
+`YYYY-MM-DD-day-NNN-session-NN` order and readable lifecycle metadata as
+evidence. Validate that exact session's source, model, and package. If invalid,
+never fall back to older sessions; repair it only when its lifecycle permits,
+restart from source-read/preparing, or allocate a new session under the normal
+lifecycle. Never invent session state, a Voice connection, or a completed
+handoff.
 
 Route current product claims, availability, UI labels, and native Voice
 capabilities through `openai-docs`. If current documentation or observable

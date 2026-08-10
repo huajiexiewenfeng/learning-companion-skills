@@ -104,22 +104,38 @@ class LearningCompanionTeachingContractTests(unittest.TestCase):
 
     def test_recovery_does_not_invent_session_state(self) -> None:
         protocol = self._section(self.skill, "Teaching Protocol", "Progress Rule")
-        self.assertRegex(protocol, r"(?is)latest open session")
+        self.assertRegex(protocol, r"(?is)newest\s+open session")
         self.assertRegex(protocol, r"(?is)(?:do not|never).*?invent.*?state")
 
     def test_recovery_validates_newest_open_session_without_older_fallback(self) -> None:
         protocol = self._section(self.skill, "Teaching Protocol", "Progress Rule")
         normalized = protocol.lower()
         ordered = (
-            "select the latest open session first",
-            "validate that same newest session",
-            "do not fall back to an older session",
+            "select the single newest open session first",
+            "validate that exact session",
+            "if invalid, never fall back to older sessions",
             "restart from source-read/preparing",
         )
         positions = [normalized.index(item) for item in ordered]
         self.assertEqual(positions, sorted(positions))
-        self.assertRegex(protocol, r"(?is)newest session.*?(?:model|package|source).*?validation")
+        self.assertRegex(protocol, r"(?is)validate that exact session.*?(?:model|package|source)")
         self.assertRegex(protocol, r"(?is)(?:repair|allocate).*?documented lifecycle")
+
+    def test_recovery_invariant_is_consistent_across_skill_voice_and_lifecycle(self) -> None:
+        protocol = self._section(self.skill, "Teaching Protocol", "Progress Rule")
+        documents = {
+            "skill": protocol,
+            "voice": self.voice,
+            "lifecycle": self.session,
+        }
+        for name, document in documents.items():
+            with self.subTest(document=name):
+                self.assertRegex(document, r"(?is)single newest open\s+session first")
+                self.assertRegex(document, r"(?is)validate\s+that exact session")
+                self.assertRegex(document, r"(?is)(?:if invalid|failed newest session).*?never.*?fall back.*?older")
+                self.assertRegex(document, r"(?is)(?:repair|restart from source-read|allocate).*?(?:lifecycle|preparing)")
+                self.assertNotRegex(document, r"(?is)(?:fall back|fallback)[^.]{0,80}older[^.]{0,80}valid")
+                self.assertNotRegex(document, r"(?is)older[^.]{0,80}valid[^.]{0,80}(?:fall back|fallback)")
 
     def test_fresh_text_after_abandoned_voice_allocates_new_text_session(self) -> None:
         self.assertRegex(self.voice, r"(?is)fresh\s+text-teaching request")
