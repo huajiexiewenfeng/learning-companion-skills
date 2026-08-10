@@ -1,3 +1,4 @@
+import ast
 import json
 import os
 import subprocess
@@ -9,6 +10,7 @@ import hashlib
 
 
 SCRIPT_DIR = Path(__file__).resolve().parents[1]
+ARTIFACT_CONTRACT = SCRIPT_DIR.parent / "references" / "lesson-artifact-contract.md"
 sys.path.insert(0, str(SCRIPT_DIR))
 
 from validate_lesson_html import (
@@ -78,8 +80,28 @@ class ValidateLessonHtmlTest(unittest.TestCase):
         self.assertIn("hub-script-not-allowlisted", validate_html(self.write(injected), (), "hub")["errors"])
 
     def test_refresh_hash_literal_is_pinned_to_the_approved_body(self):
+        source = ast.parse((SCRIPT_DIR / "validate_lesson_html.py").read_text(encoding="utf-8"))
+        assignments = [
+            node
+            for node in source.body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "HUB_REFRESH_BODY_SHA256"
+                for target in node.targets
+            )
+        ]
+        self.assertEqual(1, len(assignments))
+        self.assertIsInstance(assignments[0].value, ast.Constant)
+        self.assertIsInstance(assignments[0].value.value, str)
         self.assertEqual(APPROVED_HUB_REFRESH_BODY_SHA256, HUB_REFRESH_BODY_SHA256)
         self.assertEqual(APPROVED_HUB_REFRESH_BODY_SHA256, hashlib.sha256(HUB_REFRESH_BODY.encode("utf-8")).hexdigest())
+
+    def test_artifact_contract_publishes_the_pinned_refresh_constants(self):
+        contract = ARTIFACT_CONTRACT.read_text(encoding="utf-8")
+        self.assertIn(HUB_REFRESH_BODY, contract)
+        self.assertIn(HUB_REFRESH_BODY_SHA256, contract)
+        self.assertIn('<script id="lesson-data" type="application/json">', contract)
+        self.assertIn('<script id="lesson-refresh" data-contract="v1">', contract)
 
     def test_document_applies_the_visual_companion_shared_contract(self):
         cases = (
@@ -132,19 +154,151 @@ class ValidateLessonHtmlTest(unittest.TestCase):
                 self.assertIn(expected, errors)
 
     def test_hub_requires_an_explicit_allowlisted_refresh_status(self):
+        self.assertEqual(
+            frozenset({"preparing", "studying", "awaiting-voice"}),
+            HUB_ACTIVE_STATUSES,
+        )
         for status in HUB_ACTIVE_STATUSES:
             with self.subTest(status=status):
                 self.assertEqual("passed", validate_html(self.write(hub_html(status)), (), "hub")["overall"])
-        self.assertEqual("passed", validate_html(self.write(hub_html("closed", include_refresh=False)), (), "hub")["overall"])
-        for status, include_refresh in (("unknown", False), ("unknown", True), ("closed ", False), ("closed ", True)):
-            with self.subTest(status=status, include_refresh=include_refresh):
-                self.assertIn("hub-status-invalid", validate_html(self.write(hub_html(status, include_refresh)), (), "hub")["errors"])
+        for status in ("closed", "error"):
+            with self.subTest(status=status):
+                self.assertEqual(
+                    "passed",
+                    validate_html(self.write(hub_html(status, include_refresh=False)), (), "hub")["overall"],
+                )
+                self.assertIn(
+                    "hub-refresh-script-invalid",
+                    validate_html(self.write(hub_html(status, include_refresh=True)), (), "hub")["errors"],
+                )
+        for status in ("unknown", "closed ", " studying", "studyng", "unsynced", "sync"):
+            for include_refresh in (False, True):
+                with self.subTest(status=status, include_refresh=include_refresh):
+                    self.assertIn(
+                        "hub-status-invalid",
+                        validate_html(self.write(hub_html(status, include_refresh)), (), "hub")["errors"],
+                    )
 
     def test_hub_allows_only_contained_artifact_links(self):
         contained = HUB_HTML.replace("企业 AI 系统分层</section>", '企业 AI 系统分层 <a href="visuals/001-responsibility-map.html">map</a></section>')
         self.assertEqual("passed", validate_html(self.write(contained), (), "hub")["overall"])
         escaped = contained.replace("visuals/001-responsibility-map.html", "../escape.html")
         self.assertIn("external-resource-forbidden", validate_html(self.write(escaped), (), "hub")["errors"])
+
+    def test_allows_internal_anchors_but_rejects_meta_refresh_and_submission(self):
+        internal_anchor = DOCUMENT_HTML.replace(
+            "</section>", '<a href="#topic">jump</a><h2 id="topic">Topic</h2></section>'
+        )
+        self.assertEqual(
+            "passed", validate_html(self.write(internal_anchor), (), "document")["overall"]
+        )
+        cases = (
+            (
+                "external meta refresh",
+                '<meta http-equiv="refresh" content="0; url=https://example.test">',
+                "meta-refresh-forbidden",
+            ),
+            (
+                "fragment meta refresh",
+                '<meta http-equiv="refresh" content="0; url=#topic">',
+                "meta-refresh-forbidden",
+            ),
+            ("form", '<form method="post"></form>', "unsafe-element-forbidden"),
+            ("action", '<div action="#topic"></div>', "submission-forbidden"),
+            ("formaction", '<button formaction="#topic">go</button>', "submission-forbidden"),
+        )
+        for name, markup, expected in cases:
+            with self.subTest(name=name):
+                html = DOCUMENT_HTML.replace("</body>", markup + "</body>")
+                self.assertIn(
+                    expected, validate_html(self.write(html), (), "document")["errors"]
+                )
+
+    def test_rejects_high_risk_elements_after_namespace_normalization(self):
+        cases = (
+            ("base", '<base href="#topic">'),
+            ("object", '<object data="data:image/png;base64,AA=="></object>'),
+            ("embed", '<embed src="data:image/png;base64,AA==">'),
+            ("link", '<link href="#topic">'),
+            ("namespaced form", '<svg:form></svg:form>'),
+        )
+        for name, markup in cases:
+            with self.subTest(name=name):
+                html = DOCUMENT_HTML.replace("</body>", markup + "</body>")
+                self.assertIn(
+                    "unsafe-element-forbidden",
+                    validate_html(self.write(html), (), "document")["errors"],
+                )
+
+    def test_rejects_namespaced_url_bearing_attribute_bypasses(self):
+        cases = (
+            (
+                "xlink executable href",
+                '<a xlink:href="javascript:alert(1)">x</a>',
+                "executable-url-forbidden",
+            ),
+            (
+                "namespaced external href",
+                '<svg:a xlink:href="//example.test/x">x</svg:a>',
+                "external-resource-forbidden",
+            ),
+            (
+                "namespaced src",
+                '<img svg:src="file:///C:/secret.png">',
+                "external-resource-forbidden",
+            ),
+        )
+        for name, markup, expected in cases:
+            with self.subTest(name=name):
+                html = DOCUMENT_HTML.replace("</body>", markup + "</body>")
+                self.assertIn(
+                    expected, validate_html(self.write(html), (), "document")["errors"]
+                )
+
+    def test_duplicate_security_attributes_fail_before_value_collapse(self):
+        cases = (
+            (
+                "http equiv",
+                '<meta http-equiv="other" http-equiv="refresh" content="0;url=#topic">',
+                "meta-refresh-forbidden",
+            ),
+            (
+                "content",
+                '<meta http-equiv="refresh" content="0" content="0;url=#topic">',
+                "meta-refresh-forbidden",
+            ),
+            (
+                "href",
+                '<a href="#topic" href="javascript:alert(1)">x</a>',
+                "executable-url-forbidden",
+            ),
+            (
+                "src",
+                '<img src="data:image/png;base64,AA==" src="//example.test/x.png">',
+                "external-resource-forbidden",
+            ),
+            (
+                "action",
+                '<form action="#topic" action="https://example.test"></form>',
+                "submission-forbidden",
+            ),
+            (
+                "formaction",
+                '<button formaction="#topic" formaction="https://example.test">go</button>',
+                "submission-forbidden",
+            ),
+            (
+                "xlink href",
+                '<a xlink:href="#topic" xlink:href="javascript:alert(1)">x</a>',
+                "executable-url-forbidden",
+            ),
+        )
+        for name, markup, expected in cases:
+            with self.subTest(name=name):
+                html = DOCUMENT_HTML.replace("</body>", markup + "</body>")
+                errors = validate_html(self.write(html), (), "document")["errors"]
+                self.assertIn("malformed-html", errors)
+                self.assertIn(expected, errors)
 
     def test_unknown_profile_is_rejected(self):
         with self.assertRaisesRegex(ValueError, "unknown profile: unknown"):

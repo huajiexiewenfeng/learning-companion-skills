@@ -17,11 +17,11 @@ from urllib.parse import unquote
 DEFAULT_MAX_BYTES = 2_000_000
 PROFILES = frozenset({"document", "technical-visual", "hub"})
 ALLOWED_HUB_SCRIPTS = frozenset({"lesson-data", "lesson-refresh"})
-# The active hub states are deliberately finite: each owns the same approved
-# controller, while a closed hub remains fully navigable without one.
-HUB_ACTIVE_STATUSES = frozenset({"studying", "awaiting-voice", "unsynced"})
-HUB_CLOSED_STATUSES = frozenset({"closed"})
-HUB_ALLOWED_STATUSES = HUB_ACTIVE_STATUSES | HUB_CLOSED_STATUSES
+# The refreshing hub states are a strict subset of the canonical lifecycle.
+# Synchronization state is independent and must never expand this allowlist.
+HUB_ACTIVE_STATUSES = frozenset({"preparing", "studying", "awaiting-voice"})
+HUB_NON_REFRESH_STATUSES = frozenset({"closed", "error"})
+HUB_ALLOWED_STATUSES = HUB_ACTIVE_STATUSES | HUB_NON_REFRESH_STATUSES
 HUB_REFRESH_BODY = """(() => {
   const key = `learning-companion-scroll:${location.pathname}`;
   addEventListener("beforeunload", () => sessionStorage.setItem(key, String(scrollY)));
@@ -32,7 +32,29 @@ HUB_REFRESH_BODY = """(() => {
   setTimeout(() => location.reload(), 5000);
 })();"""
 HUB_REFRESH_BODY_SHA256 = "c74305cd5efdf45e05e60680f948c0f58ccab9d99ac1a1d79e62e8fda57ee099"
-RESOURCE_ATTRIBUTES = frozenset({"src", "srcset", "href", "poster", "action", "data"})
+RESOURCE_ATTRIBUTES = frozenset(
+    {
+        "action",
+        "archive",
+        "background",
+        "cite",
+        "classid",
+        "codebase",
+        "data",
+        "formaction",
+        "href",
+        "longdesc",
+        "manifest",
+        "ping",
+        "poster",
+        "profile",
+        "src",
+        "srcset",
+        "usemap",
+    }
+)
+SUBMISSION_ATTRIBUTES = frozenset({"action", "formaction"})
+UNSAFE_ELEMENTS = frozenset({"area", "base", "embed", "form", "link", "object"})
 VOID_TAGS = frozenset({"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"})
 EXECUTABLE_SCHEMES = frozenset({"javascript", "vbscript"})
 NETWORK_PATTERNS = (
@@ -50,6 +72,14 @@ HUB_ARTIFACT_PATH = re.compile(r"(?:cards|decks|visuals)/[A-Za-z0-9][A-Za-z0-9._
 def append_once(errors: list[str], error: str) -> None:
     if error not in errors:
         errors.append(error)
+
+
+def normalize_markup_name(name: str) -> str:
+    """Return the namespace-independent HTML/SVG name used for policy checks."""
+    normalized = unescape(name).casefold()
+    if "}" in normalized:
+        normalized = normalized.rsplit("}", 1)[-1]
+    return normalized.rsplit(":", 1)[-1]
 
 
 def normalize_url(value: str) -> str:
@@ -124,6 +154,9 @@ class ContractParser(HTMLParser):
         self.external_resources: list[tuple[str, str, str]] = []
         self.executable_urls: list[str] = []
         self.event_handlers: list[str] = []
+        self.meta_refreshes = 0
+        self.submission_attributes: list[str] = []
+        self.unsafe_elements: list[str] = []
         self.svg_records: list[dict[str, Any]] = []
         self.script_records: list[dict[str, Any]] = []
         self.style_records: list[list[str]] = []
@@ -153,11 +186,21 @@ class ContractParser(HTMLParser):
         self.mark_malformed()
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        normalized_tag = tag.lower()
-        self._validate_start(normalized_tag, attrs)
-        normalized_attrs = tuple((name.lower(), value) for name, value in attrs)
+        normalized_tag = normalize_markup_name(tag)
+        normalized_attrs = tuple((normalize_markup_name(name), value) for name, value in attrs)
+        self._validate_start(normalized_tag, normalized_attrs)
         attributes = dict(normalized_attrs)
-        self._record_attributes(normalized_tag, attrs)
+        self._record_attributes(normalized_tag, normalized_attrs)
+
+        if normalized_tag in UNSAFE_ELEMENTS:
+            self.unsafe_elements.append(normalized_tag)
+        if normalized_tag == "meta" and any(
+            name == "http-equiv"
+            and value is not None
+            and unescape(value).strip().casefold() == "refresh"
+            for name, value in normalized_attrs
+        ):
+            self.meta_refreshes += 1
 
         if normalized_tag == "html":
             self.html_roots += 1
@@ -208,11 +251,11 @@ class ContractParser(HTMLParser):
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         self.handle_starttag(tag, attrs)
-        if tag.lower() not in VOID_TAGS:
+        if normalize_markup_name(tag) not in VOID_TAGS:
             self.handle_endtag(tag)
 
     def handle_endtag(self, tag: str) -> None:
-        normalized_tag = tag.lower()
+        normalized_tag = normalize_markup_name(tag)
         if normalized_tag in VOID_TAGS or not self._tag_stack or self._tag_stack[-1] != normalized_tag:
             self.mark_malformed()
             return
@@ -245,13 +288,12 @@ class ContractParser(HTMLParser):
         if not self._html_seen or self._head_count != 1 or self._body_count != 1:
             self.mark_malformed()
 
-    def _validate_start(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+    def _validate_start(self, tag: str, attrs: tuple[tuple[str, str | None], ...]) -> None:
         seen_attributes: set[str] = set()
         for name, _ in attrs:
-            normalized_name = name.lower()
-            if normalized_name in seen_attributes:
+            if name in seen_attributes:
                 self.mark_malformed()
-            seen_attributes.add(normalized_name)
+            seen_attributes.add(name)
 
         if tag == "html":
             if self._html_seen or self._tag_stack:
@@ -278,17 +320,18 @@ class ContractParser(HTMLParser):
         if tag == "section" and "body" not in self._tag_stack:
             self.mark_malformed()
 
-    def _record_attributes(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+    def _record_attributes(self, tag: str, attrs: tuple[tuple[str, str | None], ...]) -> None:
         for name, value in attrs:
-            normalized_name = name.lower()
-            if normalized_name.startswith("on"):
-                self.event_handlers.append(normalized_name)
-            if normalized_name == "style" and value is not None:
+            if name.startswith("on"):
+                self.event_handlers.append(name)
+            if name == "style" and value is not None:
                 self.inline_style_records.append(value)
-            if normalized_name in RESOURCE_ATTRIBUTES and value is not None:
+            if name in SUBMISSION_ATTRIBUTES:
+                self.submission_attributes.append(name)
+            if name in RESOURCE_ATTRIBUTES and value is not None:
                 violation = url_violation(value)
                 if violation == "external-resource-forbidden":
-                    self.external_resources.append((tag, normalized_name, value))
+                    self.external_resources.append((tag, name, value))
                 elif violation == "executable-url-forbidden":
                     self.executable_urls.append(value)
 
@@ -342,6 +385,12 @@ def enforce_shared_contract(
         append_once(errors, "section-missing")
     if parser.iframes:
         append_once(errors, "iframe-forbidden")
+    if parser.unsafe_elements:
+        append_once(errors, "unsafe-element-forbidden")
+    if parser.meta_refreshes:
+        append_once(errors, "meta-refresh-forbidden")
+    if parser.submission_attributes:
+        append_once(errors, "submission-forbidden")
     if parser.event_handlers:
         append_once(errors, "event-handler-forbidden")
     if parser.executable_urls:
