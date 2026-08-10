@@ -61,3 +61,32 @@ Archive 是历史证据的保管处，Memory 是帮助下一轮工作的信息�
 - `evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK`：课程定义的五层责任和 Archive / Memory / Authoritative State / Plan / Checkpoint / Trace 边界。
 - `evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS`：用户确认的长上下文压缩与执行漂移症状；Project Develop Copilot 仅作说明性复合案例。
 - `evidence.md#E3-LIFECYCLE-AND-ARTIFACT-CONTROLS`：会话包、离线 HTML 存档、确定性验证和独立视觉复核门禁。
+
+## 教学回合索引
+
+<!-- lesson-turn-id: turn-001 -->
+## 企业 AI 系统分层：模型能力不等于系统能力
+
+<!-- lesson-turn-id: turn-002 -->
+## 五层企业 AI 系统分层
+
+<!-- lesson-turn-id: turn-003 -->
+## 责任图：建议、控制与事实不能混在一起
+
+<!-- lesson-turn-id: turn-004 -->
+## 可靠交付流：证据到验收的受控路径
+
+<!-- lesson-turn-id: turn-005 -->
+## Archive、Memory 与 Authoritative State 的三种记录
+
+<!-- lesson-turn-id: turn-006 -->
+## Project Develop Copilot：长对话压缩症状的说明性复合案例
+
+<!-- lesson-turn-id: turn-007 -->
+## 误区：完整的 Memory 就是当前事实
+
+<!-- lesson-turn-id: turn-008 -->
+## 检查问题：恢复后先核对什么？
+
+<!-- lesson-turn-id: turn-009 -->
+## 来源与发布门禁

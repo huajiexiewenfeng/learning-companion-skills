@@ -45,3 +45,9 @@ The six technical-visual pages (three card pages and their three deck-slide coun
 - Five-layer map: layer/boundary labels and relationship presentation remained readable and complete at both viewports.
 
 Screenshots were transient browser evidence. Generated HTML was not hand-edited for this audit.
+
+## Post-remediation deterministic rebuild
+
+The package was rebuilt on 2026-08-10 after lifecycle, provenance, and offline-security remediation. A ledger-to-ledger SHA-256 comparison against the visually audited package found **20 of 21 HTML artifacts byte-identical**; the only changed artifact was the hub. The hub change is limited to lifecycle/sync metadata and the pinned refresh contract, not its CSS or page composition. Closed-package validation passed, the hub contains no refresh controller, unchanged sync was byte-identical, no `-v2.html` was created, and public validation did not recreate a session lock.
+
+The artifact ledger's literal `visual verification pending` value remains the runtime-owned per-artifact review state. This audit is separate human/browser evidence and does not hand-edit generated ledger records.

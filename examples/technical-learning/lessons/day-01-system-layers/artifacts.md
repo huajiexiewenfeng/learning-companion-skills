@@ -8,15 +8,15 @@
       "type": "hub",
       "title": "企业 AI 系统分层：从模型能力到可靠交付",
       "profile": "hub",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-001",
       "sourceRefs": [
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK",
         "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS",
         "evidence.md#E3-LIFECYCLE-AND-ARTIFACT-CONTROLS"
       ],
       "version": 1,
-      "status": "visual verification passed",
-      "sha256": "65ee3d6b91cf2b50c065e61f453ccf9146e3aeaec34121ebe803536b11f3afca",
+      "status": "visual verification pending",
+      "sha256": "dc119e572f5eca9823a4295b59ae8675bda94367049eb14b8d27f3b4d7c120bc",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
       "supersedes": ""
@@ -28,12 +28,12 @@
       "type": "card",
       "title": "企业 AI 系统分层：模型能力不等于系统能力",
       "profile": "document",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-001",
       "sourceRefs": [
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "6d591b706255d00a35f669468becbee39dbdc72a16d0477625c8bd4617efaab7",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -46,12 +46,12 @@
       "type": "card",
       "title": "五层企业 AI 系统分层",
       "profile": "technical-visual",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-002",
       "sourceRefs": [
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "4b880d90eb36c9e0d6624b3322e12c64535f6624d268e97cd08a6f4535568e2a",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -64,12 +64,12 @@
       "type": "card",
       "title": "责任图：建议、控制与事实不能混在一起",
       "profile": "technical-visual",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-003",
       "sourceRefs": [
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "f06a7f8832d26cde21bf5c031269eb62286f9fed2dd05eb71dd68e3c8940f032",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -82,12 +82,12 @@
       "type": "card",
       "title": "可靠交付流：证据到验收的受控路径",
       "profile": "technical-visual",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-004",
       "sourceRefs": [
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "1580f266c3128b15fe53e487df0bec76b01785acb178ae16ddbb2a969b386f8a",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -100,12 +100,12 @@
       "type": "card",
       "title": "Archive、Memory 与 Authoritative State 的三种记录",
       "profile": "document",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-005",
       "sourceRefs": [
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "8990a7de97eaa209c6958403974dfe793597b074ea2f650d08b91fc48088c8ef",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -118,12 +118,12 @@
       "type": "card",
       "title": "Project Develop Copilot：长对话压缩症状的说明性复合案例",
       "profile": "document",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-006",
       "sourceRefs": [
         "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "b32acc130ca599a8a7ee05fbf4a2265705a94e4eade44e22cb5cfd2ec1810b0f",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -136,13 +136,13 @@
       "type": "card",
       "title": "误区：完整的 Memory 就是当前事实",
       "profile": "document",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-007",
       "sourceRefs": [
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK",
         "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "41dde7a8f272d91c6a110ea5c2317c000a732a2025aa92f0249366386dfe4274",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -155,12 +155,12 @@
       "type": "card",
       "title": "检查问题：恢复后先核对什么？",
       "profile": "document",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-008",
       "sourceRefs": [
         "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "d7dd2b6dff9e9f7c542ddc049c80b24884320f98e8699fff13cd281096609e09",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -173,12 +173,12 @@
       "type": "card",
       "title": "来源与发布门禁",
       "profile": "document",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-009",
       "sourceRefs": [
         "evidence.md#E3-LIFECYCLE-AND-ARTIFACT-CONTROLS"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "fd48e0e087e1aa7b653d2380dea86e246b776f967e1c831d3d3411fea93b66c5",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -191,12 +191,12 @@
       "type": "deck",
       "title": "Day 1｜企业 AI 系统分层与责任图",
       "profile": "document",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-001",
       "sourceRefs": [
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "bf16e00ca8314128594347ba06c86fa8bf697c91c364dddf71475bd7076b947c",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -209,12 +209,12 @@
       "type": "slide",
       "title": "企业 AI 系统分层：模型能力不等于系统能力",
       "profile": "document",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-001",
       "sourceRefs": [
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "6d591b706255d00a35f669468becbee39dbdc72a16d0477625c8bd4617efaab7",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -227,12 +227,12 @@
       "type": "slide",
       "title": "五层企业 AI 系统分层",
       "profile": "technical-visual",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-002",
       "sourceRefs": [
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "4b880d90eb36c9e0d6624b3322e12c64535f6624d268e97cd08a6f4535568e2a",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -245,12 +245,12 @@
       "type": "slide",
       "title": "责任图：建议、控制与事实不能混在一起",
       "profile": "technical-visual",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-003",
       "sourceRefs": [
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "f06a7f8832d26cde21bf5c031269eb62286f9fed2dd05eb71dd68e3c8940f032",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -263,14 +263,14 @@
       "type": "deck",
       "title": "Day 1｜可靠交付与执行漂移复盘",
       "profile": "document",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-004",
       "sourceRefs": [
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK",
         "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS",
         "evidence.md#E3-LIFECYCLE-AND-ARTIFACT-CONTROLS"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "46d6721e69d32fcf0c4fbc80635af3bd4fa62b5c8b44ca86fac022c51f95d779",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -283,12 +283,12 @@
       "type": "slide",
       "title": "可靠交付流：证据到验收的受控路径",
       "profile": "technical-visual",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-004",
       "sourceRefs": [
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "1580f266c3128b15fe53e487df0bec76b01785acb178ae16ddbb2a969b386f8a",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -301,12 +301,12 @@
       "type": "slide",
       "title": "Archive、Memory 与 Authoritative State 的三种记录",
       "profile": "document",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-005",
       "sourceRefs": [
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "8990a7de97eaa209c6958403974dfe793597b074ea2f650d08b91fc48088c8ef",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -319,12 +319,12 @@
       "type": "slide",
       "title": "Project Develop Copilot：长对话压缩症状的说明性复合案例",
       "profile": "document",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-006",
       "sourceRefs": [
         "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "b32acc130ca599a8a7ee05fbf4a2265705a94e4eade44e22cb5cfd2ec1810b0f",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -337,13 +337,13 @@
       "type": "slide",
       "title": "误区：完整的 Memory 就是当前事实",
       "profile": "document",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-007",
       "sourceRefs": [
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK",
         "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "41dde7a8f272d91c6a110ea5c2317c000a732a2025aa92f0249366386dfe4274",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -356,12 +356,12 @@
       "type": "slide",
       "title": "检查问题：恢复后先核对什么？",
       "profile": "document",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-008",
       "sourceRefs": [
         "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "d7dd2b6dff9e9f7c542ddc049c80b24884320f98e8699fff13cd281096609e09",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -374,12 +374,12 @@
       "type": "slide",
       "title": "来源与发布门禁",
       "profile": "document",
-      "sourceTurn": "lesson-model.json",
+      "sourceTurn": "turn-009",
       "sourceRefs": [
         "evidence.md#E3-LIFECYCLE-AND-ARTIFACT-CONTROLS"
       ],
       "version": 1,
-      "status": "visual verification passed",
+      "status": "visual verification pending",
       "sha256": "fd48e0e087e1aa7b653d2380dea86e246b776f967e1c831d3d3411fea93b66c5",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
