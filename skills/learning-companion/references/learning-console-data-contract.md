@@ -69,8 +69,10 @@ lessonSessions: [{
 }]
 ```
 
-`indexPath` must be a relative workspace path. The console renders session fields as text
-and rejects protocol, network-path, control-character, and whitespace-containing links.
+`indexPath` must be the normalized workspace-relative lesson archive shape
+`learning-companion/plans/<plan-id>/lessons/<session-id>/index.html`. The console renders
+session fields as text and rejects traversal (`..`, including encoded forms), absolute or
+protocol/network paths, backslashes, control characters, whitespace, and non-lesson paths.
 
 ## sourceFiles
 

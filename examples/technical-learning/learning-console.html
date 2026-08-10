@@ -972,8 +972,8 @@
 
 <!-- learning-companion:lesson-sessions:renderer:start -->
     function safeLessonPath(value) {
-      const path = String(value || "").trim();
-      return path && !/^[a-z][a-z0-9+.-]*:/i.test(path) && !/^(?:\\|\/\/)/.test(path) && !/[\u0000-\u001f\s]/.test(path) ? path : "";
+      const lessonArchivePath = /^learning-companion\/plans\/[A-Za-z0-9][A-Za-z0-9._-]*\/lessons\/[A-Za-z0-9][A-Za-z0-9._-]*\/index\.html$/;
+      return typeof value === "string" && value === value.trim() && lessonArchivePath.test(value) ? value : "";
     }
 
     function renderLessonSessions(sessions, activeLesson) {

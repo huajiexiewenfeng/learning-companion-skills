@@ -268,6 +268,9 @@ Do not create the console during:
 
 Use `scripts/upgrade_learning_console.py` to move a version-1 console to version 2. It
 copies only template marker-delimited navigation, styles, lesson-session section, renderer,
-and render call around unique legacy anchors. It refuses malformed, missing, or ambiguous
-anchors without writing the target, preserves the data block and custom content, and writes
-atomically as UTF-8 without a BOM. A valid version-2 console is a byte-identical no-op.
+and render call around unique structural legacy anchors. It refuses malformed, missing,
+ambiguous, misplaced, commented, or script-string anchors without writing the target. A v2
+file must also contain the complete feature payload in the required DOM/script locations;
+marker text alone is never enough for a no-op. The upgrader preserves the data block and
+custom content, writes atomically as UTF-8 without a BOM, and makes a valid version-2
+console byte-identical on a second run.
