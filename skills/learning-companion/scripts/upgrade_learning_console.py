@@ -15,6 +15,10 @@ from typing import Sequence
 
 VERSION = "2"
 FEATURES = ("nav", "style", "section", "renderer", "render-call")
+UNSAFE_FEATURE_RE = re.compile(
+    r"(?:\b(?:innerHTML|outerHTML|insertAdjacentHTML|eval)\b|\bnew\s+Function\b|\bdocument\s*\.\s*write\b|\.\s*on[a-z]+\s*=|\bon[a-z]+\s*=|javascript\s*:)",
+    re.IGNORECASE,
+)
 DATA_OPEN_RE = re.compile(r"<script\b(?=[^>]*\bid\s*=\s*['\"]learning-data['\"])[^>]*>", re.IGNORECASE)
 HTML_OPEN_RE = re.compile(r"<html\b[^>]*>", re.IGNORECASE)
 VERSION_RE = re.compile(r"\sdata-learning-console-version\s*=\s*(['\"])([^'\"]*)\1", re.IGNORECASE)
@@ -253,6 +257,10 @@ def _feature_fragment(template: str, feature: str) -> str:
     return template[start_at : end_at + len(end)]
 
 
+def _normalize_newlines(text: str, newline: str = "\n") -> str:
+    return text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", newline)
+
+
 def _marker_bounds(text: str, feature: str) -> tuple[int, int]:
     start = _one(text, _marker(feature, "start"), f"{feature} start marker")
     end = _one(text, _marker(feature, "end"), f"{feature} end marker")
@@ -269,11 +277,20 @@ def _within_marker_payload(element: _Element, start: int, end: int) -> bool:
     return start <= element.start and element.close_start is not None and element.close_start < end
 
 
-def _validate_v2(text: str) -> None:
+def _validate_v2(text: str, canonical_template: str | None = None) -> None:
     _learning_data_block(text)
     if _version(text) != 2:
         raise UpgradeError("console is not version 2")
     probe = _probe_document(text)
+    blocks = {feature: _feature_fragment(text, feature) for feature in FEATURES}
+    if canonical_template is not None:
+        for feature, payload in blocks.items():
+            canonical = _feature_fragment(canonical_template, feature)
+            if _normalize_newlines(payload) != _normalize_newlines(canonical):
+                raise UpgradeError(f"{feature} marker payload does not match the canonical template")
+    for feature, payload in blocks.items():
+        if UNSAFE_FEATURE_RE.search(payload):
+            raise UpgradeError(f"unsafe sink in {feature} marker payload")
     nav_bounds = _marker_bounds(text, "nav")
     nav = _exactly_one(probe.find("nav", lambda item: "nav-group" in _classes(item) and "aside" in item.parents), "v2 navigation group")
     if not _inside(nav, *nav_bounds):
@@ -362,16 +379,16 @@ def upgrade_console(path: Path | str, template_path: Path | str) -> UpgradeRepor
     except (OSError, UnicodeDecodeError) as exc:
         raise UpgradeError(str(exc)) from exc
 
-    _validate_v2(template)
+    _validate_v2(template, template)
     original_data = _learning_data_block(original)
     previous_version = _version(original)
     if previous_version == 2:
-        _validate_v2(original)
+        _validate_v2(original, template)
         return UpgradeReport(False, 2, 2, True)
 
     _validate_legacy_structure(original)
     newline = "\r\n" if "\r\n" in original else "\n"
-    fragments = {feature: _feature_fragment(template, feature) for feature in FEATURES}
+    fragments = {feature: _normalize_newlines(_feature_fragment(template, feature), newline) for feature in FEATURES}
     staged = original
     staged = _insert_once(staged, "</style>", fragments["style"], before=True, description="legacy style closing tag", newline=newline)
     staged = _insert_once(staged, "</nav>", fragments["nav"], before=True, description="legacy navigation closing tag", newline=newline)
@@ -381,7 +398,7 @@ def upgrade_console(path: Path | str, template_path: Path | str) -> UpgradeRepor
     if _learning_data_block(staged) != original_data:
         raise UpgradeError("migration would alter script#learning-data")
     staged = _set_version_2(staged)
-    _validate_v2(staged)
+    _validate_v2(staged, template)
     try:
         _atomic_write(target, staged.encode("utf-8"))
     except (OSError, UnicodeError) as exc:

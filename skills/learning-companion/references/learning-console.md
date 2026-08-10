@@ -274,3 +274,7 @@ file must also contain the complete feature payload in the required DOM/script l
 marker text alone is never enough for a no-op. The upgrader preserves the data block and
 custom content, writes atomically as UTF-8 without a BOM, and makes a valid version-2
 console byte-identical on a second run.
+
+When inserting feature fragments, the upgrader converts only their line breaks to the target
+console's existing convention. A CRLF console therefore remains free of lone LF bytes; an LF
+console remains LF. Existing user content and the learning-data block are otherwise untouched.

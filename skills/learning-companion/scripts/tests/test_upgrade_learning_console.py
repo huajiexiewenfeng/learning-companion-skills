@@ -29,6 +29,13 @@ def extract_learning_data_block(text):
     return text[start:end]
 
 
+def feature_block(text, feature):
+    start = f"<!-- learning-companion:lesson-sessions:{feature}:start -->"
+    end = f"<!-- learning-companion:lesson-sessions:{feature}:end -->"
+    first = text.index(start)
+    return text[first : text.index(end, first) + len(end)]
+
+
 class UpgradeLearningConsoleTests(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
@@ -53,6 +60,7 @@ class UpgradeLearningConsoleTests(unittest.TestCase):
         self.assertIn("/* user-custom-css */", after)
         self.assertIn('id="lesson-sessions"', after)
         self.assertIn(b"\r\n", after_bytes)
+        self.assertNotIn(b"\n", after_bytes.replace(b"\r\n", b""))
         self.assertFalse(after_bytes.startswith(b"\xef\xbb\xbf"))
         self.assertNotEqual(before_bytes, after_bytes)
 
@@ -65,6 +73,28 @@ class UpgradeLearningConsoleTests(unittest.TestCase):
         self.assertFalse(report.changed)
         self.assertEqual(first, self.target.read_bytes())
         self.assertEqual(2, report.current_version)
+
+    def test_v2_feature_blocks_are_exact_template_payloads_and_reject_unsafe_sinks(self):
+        self.module.upgrade_console(self.target, TEMPLATE)
+        valid = self.target.read_text(encoding="utf-8")
+        renderer = feature_block(valid, "renderer")
+        start = "<!-- learning-companion:lesson-sessions:renderer:start -->"
+        end = "<!-- learning-companion:lesson-sessions:renderer:end -->"
+        payload = renderer.replace(start, "").replace(end, "")
+        cases = (
+            ("harmless payload drift", valid.replace("const content = [];", "const content = []; // drift", 1)),
+            ("moved renderer payload", valid.replace(renderer, start + "\n" + end).replace("    function render() {", payload + "\n    function render() {", 1)),
+            ("outer html", valid.replace("list.replaceChildren(...content);", "list.outerHTML = '<p>x</p>'; list.replaceChildren(...content);", 1)),
+            ("adjacent html", valid.replace("list.replaceChildren(...content);", "list.insertAdjacentHTML('beforeend', '<p>x</p>'); list.replaceChildren(...content);", 1)),
+            ("document write", valid.replace("list.replaceChildren(...content);", "document.write('x'); list.replaceChildren(...content);", 1)),
+            ("inline event", valid.replace("link.href = path;", "link.onclick = () => 1; link.href = path;", 1)),
+            ("eval", valid.replace("list.replaceChildren(...content);", "eval('1'); list.replaceChildren(...content);", 1)),
+            ("javascript url", valid.replace("link.href = path;", "link.href = 'javascript:alert(1)';", 1)),
+        )
+        for name, corrupted in cases:
+            with self.subTest(name=name):
+                self.target.write_text(corrupted, encoding="utf-8")
+                self.assert_refuses_without_write(lambda: None)
 
     def test_malformed_or_ambiguous_target_fails_without_write(self):
         original = self.target.read_bytes()
