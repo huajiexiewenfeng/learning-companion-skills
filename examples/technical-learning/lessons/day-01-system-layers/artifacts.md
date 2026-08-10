@@ -15,7 +15,7 @@
         "evidence.md#E3-LIFECYCLE-AND-ARTIFACT-CONTROLS"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "65ee3d6b91cf2b50c065e61f453ccf9146e3aeaec34121ebe803536b11f3afca",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -33,7 +33,7 @@
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "6d591b706255d00a35f669468becbee39dbdc72a16d0477625c8bd4617efaab7",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -51,7 +51,7 @@
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "4b880d90eb36c9e0d6624b3322e12c64535f6624d268e97cd08a6f4535568e2a",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -69,7 +69,7 @@
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "f06a7f8832d26cde21bf5c031269eb62286f9fed2dd05eb71dd68e3c8940f032",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -87,7 +87,7 @@
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "1580f266c3128b15fe53e487df0bec76b01785acb178ae16ddbb2a969b386f8a",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -105,7 +105,7 @@
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "8990a7de97eaa209c6958403974dfe793597b074ea2f650d08b91fc48088c8ef",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -123,7 +123,7 @@
         "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "b32acc130ca599a8a7ee05fbf4a2265705a94e4eade44e22cb5cfd2ec1810b0f",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -142,7 +142,7 @@
         "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "41dde7a8f272d91c6a110ea5c2317c000a732a2025aa92f0249366386dfe4274",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -160,7 +160,7 @@
         "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "d7dd2b6dff9e9f7c542ddc049c80b24884320f98e8699fff13cd281096609e09",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -178,7 +178,7 @@
         "evidence.md#E3-LIFECYCLE-AND-ARTIFACT-CONTROLS"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "fd48e0e087e1aa7b653d2380dea86e246b776f967e1c831d3d3411fea93b66c5",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -196,7 +196,7 @@
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "bf16e00ca8314128594347ba06c86fa8bf697c91c364dddf71475bd7076b947c",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -214,7 +214,7 @@
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "6d591b706255d00a35f669468becbee39dbdc72a16d0477625c8bd4617efaab7",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -232,7 +232,7 @@
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "4b880d90eb36c9e0d6624b3322e12c64535f6624d268e97cd08a6f4535568e2a",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -250,7 +250,7 @@
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "f06a7f8832d26cde21bf5c031269eb62286f9fed2dd05eb71dd68e3c8940f032",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -270,7 +270,7 @@
         "evidence.md#E3-LIFECYCLE-AND-ARTIFACT-CONTROLS"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "46d6721e69d32fcf0c4fbc80635af3bd4fa62b5c8b44ca86fac022c51f95d779",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -288,7 +288,7 @@
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "1580f266c3128b15fe53e487df0bec76b01785acb178ae16ddbb2a969b386f8a",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -306,7 +306,7 @@
         "evidence.md#E1-COURSE-DEFINED-FIVE-LAYER-FRAMEWORK"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "8990a7de97eaa209c6958403974dfe793597b074ea2f650d08b91fc48088c8ef",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -324,7 +324,7 @@
         "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "b32acc130ca599a8a7ee05fbf4a2265705a94e4eade44e22cb5cfd2ec1810b0f",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -343,7 +343,7 @@
         "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "41dde7a8f272d91c6a110ea5c2317c000a732a2025aa92f0249366386dfe4274",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -361,7 +361,7 @@
         "evidence.md#E2-USER-CONFIRMED-LONG-CONTEXT-SYMPTOMS"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "d7dd2b6dff9e9f7c542ddc049c80b24884320f98e8699fff13cd281096609e09",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
@@ -379,7 +379,7 @@
         "evidence.md#E3-LIFECYCLE-AND-ARTIFACT-CONTROLS"
       ],
       "version": 1,
-      "status": "visual verification pending",
+      "status": "visual verification passed",
       "sha256": "fd48e0e087e1aa7b653d2380dea86e246b776f967e1c831d3d3411fea93b66c5",
       "createdAt": "1970-01-01T00:00:00Z",
       "updatedAt": "1970-01-01T00:00:00Z",
