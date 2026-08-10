@@ -1,3 +1,7 @@
 # Lesson archives persist byte-level SHA-256 values in artifacts.md.
 examples/technical-learning/lessons/day-01-system-layers/* text eol=lf
 examples/technical-learning/lessons/day-01-system-layers/** text eol=lf
+
+# Installed skills are audited byte-for-byte against the repository source.
+skills/learning-companion/* text eol=lf
+skills/learning-companion/** text eol=lf
