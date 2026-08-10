@@ -86,3 +86,8 @@ declared profile. A minimum teaching package has `lesson.md`,
 `lesson-model.json`, `artifacts.md`, an `index.html` hub, one main deck, and at
 least one `technical-visual`. A package that is visually pending may be linked
 with that literal status; it must not be described as visually reviewed.
+
+Package identity is session-specific. An abandoned `awaiting-voice` package may
+remain as history, but a later fresh text request must validate a newly
+allocated text-mode package before it can enter `studying`; it cannot repurpose
+the Voice package as its text courseware.

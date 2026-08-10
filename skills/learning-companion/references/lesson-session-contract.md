@@ -37,6 +37,11 @@ becomes `awaiting-voice`. The teaching layer may transition `awaiting-voice` to
 taken over the prepared session. A failed prepare remains `preparing` and has
 no final artifact promotion.
 
+An `awaiting-voice` session is immutable mode history for later routing. A
+fresh text request after an abandoned Voice handoff allocates and prepares a
+new text-mode session; it must not reuse, reclassify, or promote the Voice
+session into `studying`.
+
 `prepare`, `sync`, `validate`, and `close` hold an exclusive per-session lock.
 They re-read the model, lifecycle state, and ledger only after acquiring that
 lock. This serializes concurrent callers, preventing lost records, orphaned
@@ -76,6 +81,12 @@ reject later `sync` calls; existing progress-related files are outside this
 module's write scope. Closing/freezing is a package action, not evidence of
 mastery: the parent learning protocol performs it only after its normal `下课`
 mastery review and is solely responsible for any Effective-progress decision.
+
+Recovery is a teaching-layer selection rule: choose the newest open direct
+child by the allocated directory's date/day/session sequence before validating
+its source, model, and package. A failed newest session is never replaced by an
+older candidate; restart at source read/preparing and repair or allocate under
+the normal lifecycle instead.
 
 ## Ledger and timestamps
 

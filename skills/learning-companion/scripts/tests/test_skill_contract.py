@@ -93,7 +93,7 @@ class LearningCompanionTeachingContractTests(unittest.TestCase):
     def test_voice_speech_turn_contract_is_bounded_and_interruption_first(self) -> None:
         self.assertRegex(self.voice, r"(?is)45.?90 second.*?concept chunk")
         self.assertRegex(self.voice, r"(?is)interruption-first")
-        self.assertRegex(self.voice, r"(?is)exactly one check question")
+        self.assertRegex(self.voice, r"(?is)exactly\s+one\s+check question")
 
     def test_per_turn_persistence_orders_markdown_html_then_response(self) -> None:
         protocol = self._section(self.skill, "Teaching Protocol", "Progress Rule")
@@ -106,6 +106,36 @@ class LearningCompanionTeachingContractTests(unittest.TestCase):
         protocol = self._section(self.skill, "Teaching Protocol", "Progress Rule")
         self.assertRegex(protocol, r"(?is)latest open session")
         self.assertRegex(protocol, r"(?is)(?:do not|never).*?invent.*?state")
+
+    def test_recovery_validates_newest_open_session_without_older_fallback(self) -> None:
+        protocol = self._section(self.skill, "Teaching Protocol", "Progress Rule")
+        normalized = protocol.lower()
+        ordered = (
+            "select the latest open session first",
+            "validate that same newest session",
+            "do not fall back to an older session",
+            "restart from source-read/preparing",
+        )
+        positions = [normalized.index(item) for item in ordered]
+        self.assertEqual(positions, sorted(positions))
+        self.assertRegex(protocol, r"(?is)newest session.*?(?:model|package|source).*?validation")
+        self.assertRegex(protocol, r"(?is)(?:repair|allocate).*?documented lifecycle")
+
+    def test_fresh_text_after_abandoned_voice_allocates_new_text_session(self) -> None:
+        self.assertRegex(self.voice, r"(?is)fresh\s+text-teaching request")
+        self.assertRegex(self.voice, r"(?is)(?:must not|do not).*?(?:reuse|promote).*?awaiting-voice")
+        self.assertRegex(self.voice, r"(?is)allocate and prepare.*?new text-mode session/package")
+        self.assertRegex(self.voice, r"(?is)awaiting-voice history intact")
+        self.assertRegex(self.voice, r"(?is)studying.*?after.*?gates pass")
+
+    def test_one_check_question_has_only_the_close_out_review_exception(self) -> None:
+        protocol = self._section(self.skill, "Teaching Protocol", "Progress Rule")
+        daily = self._section(self.skill, "Daily Protocol", "Teaching Routes")
+        self.assertRegex(protocol, r"(?is)exactly one check question.*?ordinary teaching chunks")
+        self.assertRegex(protocol, r"(?is)only exception.*?下课.*?mastery review")
+        self.assertIn("1-3 verification questions", daily)
+        self.assertEqual(self.skill.count("1-3 verification questions"), 1)
+        self.assertRegex(daily, r"(?is)only path.*?Effective progress")
 
     def test_close_is_the_only_effective_progress_path(self) -> None:
         daily = self._section(self.skill, "Daily Protocol", "Teaching Routes")

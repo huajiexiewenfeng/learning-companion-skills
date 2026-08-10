@@ -237,9 +237,9 @@ Never substitute an unvalidated explanation, a dashboard-only preview, or an ima
 
 Use tutor mode after the courseware package has passed its gates. It is a teaching layer on top of the learning manager, not a replacement for the user's source material.
 
-For a recovered request, locate and validate the latest open session for the active plan before allocating a new one. Never invent session state: if no open session or no trustworthy state exists, say so and restart from the source-read gate.
+For a recovered request, select the latest open session first from the active plan's direct `lessons` children, using the allocated `YYYY-MM-DD-day-NNN-session-NN` order and readable lifecycle metadata as evidence. Validate that same newest session's source, model, and package before teaching. Do not fall back to an older session when the newest session fails source, model, or package validation; restart from source-read/preparing, then repair the newest session only when its lifecycle permits or allocate a new session according to the documented lifecycle. Never invent session state: if no open session or no trustworthy state exists, say so and restart from the source-read gate.
 
-Each text or Voice teaching turn is speech-first: one 45–90 second concept chunk, interruption-first, then exactly one check question. Keep the chunk tied to the current source and prepared package. When the user interrupts, answer the interruption before resuming; do not stack a second question.
+Each text or Voice teaching turn is speech-first: one 45–90 second concept chunk, interruption-first, then exactly one check question. Exactly one check question applies to ordinary teaching chunks. The only exception is the `下课` normal mastery review, which may use its established 1–3 verification questions before freeze or any Effective progress update. Keep the chunk tied to the current source and prepared package. When the user interrupts, answer the interruption before resuming; do not stack a second question.
 
 Persist a teaching turn in this exact order:
 

@@ -33,15 +33,28 @@ until the host state visibly shows it; then and only then may the session move
 from `awaiting-voice` to `studying`.
 
 If the host has no observable native Voice creation path, say that native Voice
-cannot be started from this task, keep the session `awaiting-voice` (or return
-to text only on a fresh text request), and do not represent the handoff as a
-success.
+cannot be started from this task, keep the session `awaiting-voice`, and do not
+represent the handoff as a success.
+
+## Abandoned Voice Handoff
+
+If the user abandons an awaiting-voice handoff and later makes a fresh
+text-teaching request, do not reuse or promote the awaiting-voice session.
+Allocate and prepare a new text-mode session/package through the normal
+source-read, author, validation, render, and hub gates, leaving the
+awaiting-voice history intact. Enter `studying` only after the new text
+session/package's gates pass; the earlier Voice session remains historical
+evidence and never becomes a text session.
 
 ## Teaching Turns
 
 Use the same durable source and package for both modes. Each spoken turn is
-one 45–90 second concept chunk, interruption-first, and ends with exactly one check question. Answer an interruption before returning to the planned chunk;
-never add a second check question to compensate.
+one 45–90 second concept chunk, interruption-first, and ends with exactly one
+check question for an ordinary teaching chunk. The only exception is the
+parent `下课` mastery review, which may use its established 1–3 verification
+questions before freeze or any Effective progress update. Answer an
+interruption before returning to the planned chunk; never add a second check
+question to compensate.
 
 Persist each turn under the main protocol: Markdown first, versioned HTML sync
 second, then respond. A failed write or failed sync means no persistence claim
